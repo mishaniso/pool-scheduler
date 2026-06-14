@@ -13,6 +13,7 @@ const els = {
   loginStatus: document.querySelector("#loginStatus"),
   appStatus: document.querySelector("#appStatus"),
   calendar: document.querySelector("#calendar"),
+  calendarRange: document.querySelector("#calendarRange"),
   weekTitle: document.querySelector("#weekTitle"),
   userName: document.querySelector("#userName"),
   pendingCount: document.querySelector("#pendingCount"),
@@ -57,6 +58,23 @@ function formatFullDate(date) {
 
 function statusText(status) {
   return { pending: "ממתין לאישור", approved: "מאושר", cancelled: "בוטל", rejected: "נדחה" }[status] || status;
+}
+
+function treatmentClass(type = "") {
+  if (type.includes("וואטסו")) return "type-watsu";
+  if (type.includes("הידרו")) return "type-hydro";
+  if (type.includes("קבוצ")) return "type-group";
+  if (type.includes("שחייה")) return "type-swim";
+  return "type-other";
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 function holidayFor(date) {
@@ -157,13 +175,27 @@ function bookingsForSlot(date, start) {
 
 function bookingCard(booking, compact = false) {
   const item = document.createElement("article");
-  item.className = `booking-card ${booking.status}`;
-  item.innerHTML = `
-    <strong>${booking.therapistName}</strong>
-    <span class="type-badge">${booking.treatmentType || "הידרו"}</span>
-    <span>${booking.date} ${booking.start}-${booking.end}</span>
-    ${booking.patientName ? `<span>${booking.patientName}</span>` : ""}
-    <small>${statusText(booking.status)}</small>
+  item.className = `booking-card ${booking.status} ${treatmentClass(booking.treatmentType)}`;
+  const patient = booking.patientName ? escapeHtml(booking.patientName) : "ללא שם מטופל";
+  const therapistName = escapeHtml(booking.therapistName);
+  const treatmentType = escapeHtml(booking.treatmentType || "הידרו");
+  const notes = escapeHtml(booking.notes);
+  item.innerHTML = compact ? `
+    <div class="booking-main">
+      <strong>${therapistName}</strong>
+      <small>${statusText(booking.status)}</small>
+    </div>
+    <span class="type-badge">${treatmentType}</span>
+    <span class="booking-time">${booking.start}-${booking.end}</span>
+  ` : `
+    <div class="booking-main">
+      <strong>${therapistName}</strong>
+      <small>${statusText(booking.status)}</small>
+    </div>
+    <span class="type-badge">${treatmentType}</span>
+    <span class="booking-time">${booking.date} · ${booking.start}-${booking.end}</span>
+    <span>${patient}</span>
+    ${notes ? `<p>${notes}</p>` : ""}
   `;
   const actions = document.createElement("div");
   actions.className = "card-actions";
@@ -190,6 +222,7 @@ function actionButton(text, onClick, className = "") {
 function renderCalendar() {
   const days = Array.from({ length: 7 }, (_, index) => addDays(state.weekStart, index));
   els.weekTitle.textContent = `שבוע ${formatDate(days[0])} - ${formatDate(days[6])}`;
+  els.calendarRange.textContent = `ימים ${formatDate(days[0])} עד ${formatDate(days[6])}. בחירה בשעה פנויה פותחת בקשת זימון.`;
   const hours = [];
   for (let hour = state.settings.openingHour; hour < state.settings.closingHour; hour += 1) hours.push(`${String(hour).padStart(2, "0")}:00`);
   els.calendar.innerHTML = "";
@@ -205,12 +238,13 @@ function renderCalendar() {
       const cell = document.createElement("button");
       cell.type = "button";
       cell.className = "slot";
+      cell.setAttribute("aria-label", `${formatFullDate(day)}, שעה ${hour}`);
       const bookings = bookingsForSlot(date, hour);
       if (bookings.length) {
         cell.classList.add(bookings[0].status);
         cell.append(bookingCard(bookings[0], true));
       } else {
-        cell.innerHTML = "<span>פנוי</span>";
+        cell.innerHTML = "<span>פנוי</span><small>לחץ לזימון</small>";
       }
       cell.addEventListener("click", () => openBookingDialog(date, hour));
       grid.append(cell);
@@ -248,9 +282,9 @@ function renderLists() {
 function renderBookingList(target, bookings, emptyText) {
   target.innerHTML = "";
   if (!bookings.length) {
-    const empty = document.createElement("p");
+    const empty = document.createElement("div");
     empty.className = "empty";
-    empty.textContent = emptyText;
+    empty.innerHTML = `<strong>${emptyText}</strong><span>זימונים חדשים יופיעו כאן לאחר שליחה או אישור.</span>`;
     target.append(empty);
     return;
   }

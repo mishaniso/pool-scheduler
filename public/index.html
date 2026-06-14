@@ -11,11 +11,12 @@
       <section class="login-panel">
         <p class="eyebrow">מערכת זימונים</p>
         <h1>בריכה טיפולית</h1>
+        <p class="login-copy">ניהול שבועי של זמינות הבריכה, בקשות מטפלים ואישורי מנהל.</p>
         <form id="loginForm" class="login-form">
-          <label>אימייל <input id="email" type="email" value="admin@pool.local" required /></label>
-          <label>סיסמה <input id="password" type="password" value="admin123" required /></label>
+          <label>אימייל <input id="email" type="email" value="admin@pool.local" autocomplete="username" required /></label>
+          <label>סיסמה <input id="password" type="password" value="admin123" autocomplete="current-password" required /></label>
           <button class="primary" type="submit">כניסה למערכת</button>
-          <p id="loginStatus" class="status"></p>
+          <p id="loginStatus" class="status" aria-live="polite"></p>
         </form>
         <div class="demo-users">
           <span>מנהל: admin@pool.local / admin123</span>
@@ -46,13 +47,27 @@
       </section>
 
       <section class="content-grid">
-        <section class="schedule-section"><div id="calendar" class="calendar"></div></section>
+        <section class="schedule-section">
+          <div class="calendar-toolbar">
+            <div>
+              <h2>לוח שבועי</h2>
+              <p id="calendarRange">בחר שעה פנויה כדי לפתוח בקשת זימון.</p>
+            </div>
+            <div class="legend" aria-label="מקרא סטטוסים">
+              <span><i class="legend-dot free"></i>פנוי</span>
+              <span><i class="legend-dot pending"></i>ממתין</span>
+              <span><i class="legend-dot approved"></i>מאושר</span>
+              <span><i class="legend-dot holiday"></i>שבת/חג</span>
+            </div>
+          </div>
+          <div id="calendar" class="calendar" aria-live="polite"></div>
+        </section>
         <aside class="side-panel">
           <section class="panel"><h2>בקשות ממתינות</h2><div id="pendingList" class="booking-list"></div></section>
           <section class="panel"><h2>הזימונים שלי</h2><div id="myBookings" class="booking-list"></div></section>
         </aside>
       </section>
-      <p id="appStatus" class="floating-status"></p>
+      <p id="appStatus" class="floating-status" aria-live="polite"></p>
     </main>
 
     <dialog id="bookingDialog">
