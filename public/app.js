@@ -1,0 +1,315 @@
+const state = {
+  user: JSON.parse(localStorage.getItem("poolUser") || "null"),
+  users: [],
+  settings: { openingHour: 8, closingHour: 20, slotMinutes: 60, treatmentTypes: [], holidays: [] },
+  bookings: [],
+  weekStart: startOfWeek(new Date())
+};
+
+const els = {
+  loginView: document.querySelector("#loginView"),
+  appView: document.querySelector("#appView"),
+  loginForm: document.querySelector("#loginForm"),
+  loginStatus: document.querySelector("#loginStatus"),
+  appStatus: document.querySelector("#appStatus"),
+  calendar: document.querySelector("#calendar"),
+  weekTitle: document.querySelector("#weekTitle"),
+  userName: document.querySelector("#userName"),
+  pendingCount: document.querySelector("#pendingCount"),
+  approvedCount: document.querySelector("#approvedCount"),
+  pendingList: document.querySelector("#pendingList"),
+  myBookings: document.querySelector("#myBookings"),
+  bookingDialog: document.querySelector("#bookingDialog"),
+  bookingForm: document.querySelector("#bookingForm"),
+  bookingDate: document.querySelector("#bookingDate"),
+  bookingStart: document.querySelector("#bookingStart"),
+  treatmentType: document.querySelector("#treatmentType"),
+  bookingTherapist: document.querySelector("#bookingTherapist"),
+  therapistField: document.querySelector("#therapistField"),
+  approveNowField: document.querySelector("#approveNowField"),
+  approveNow: document.querySelector("#approveNow")
+};
+
+function startOfWeek(date) {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  next.setDate(next.getDate() - next.getDay());
+  return next;
+}
+
+function addDays(date, days) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function isoDate(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function formatDate(date) {
+  return new Intl.DateTimeFormat("he-IL", { day: "2-digit", month: "2-digit" }).format(date);
+}
+
+function formatFullDate(date) {
+  return new Intl.DateTimeFormat("he-IL", { weekday: "long", day: "2-digit", month: "long" }).format(date);
+}
+
+function statusText(status) {
+  return { pending: "ממתין לאישור", approved: "מאושר", cancelled: "בוטל", rejected: "נדחה" }[status] || status;
+}
+
+function holidayFor(date) {
+  const key = isoDate(date);
+  return (state.settings.holidays || []).find((holiday) => holiday.date === key);
+}
+
+function setStatus(message, isError = false) {
+  els.appStatus.textContent = message;
+  els.appStatus.classList.toggle("error", isError);
+  if (message) setTimeout(() => {
+    if (els.appStatus.textContent === message) els.appStatus.textContent = "";
+  }, 3500);
+}
+
+async function api(path, options = {}) {
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  if (state.user?.id) headers["X-User-Id"] = state.user.id;
+  const response = await fetch(path, { ...options, headers });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || "הפעולה נכשלה.");
+  return data;
+}
+
+function showApp() {
+  const loggedIn = Boolean(state.user);
+  els.loginView.classList.toggle("hidden", loggedIn);
+  els.appView.classList.toggle("hidden", !loggedIn);
+  if (loggedIn) {
+    els.userName.textContent = `${state.user.name} (${state.user.role === "admin" ? "מנהל/ת" : "מטפל/ת"})`;
+    loadData();
+  }
+}
+
+async function login(event) {
+  event.preventDefault();
+  els.loginStatus.textContent = "";
+  try {
+    const data = await api("/api/login", {
+      method: "POST",
+      body: JSON.stringify({ email: document.querySelector("#email").value, password: document.querySelector("#password").value })
+    });
+    state.user = data.user;
+    localStorage.setItem("poolUser", JSON.stringify(state.user));
+    showApp();
+  } catch (error) {
+    els.loginStatus.textContent = error.message;
+  }
+}
+
+async function loadData() {
+  try {
+    const from = isoDate(state.weekStart);
+    const to = isoDate(addDays(state.weekStart, 6));
+    const [schedule, users] = await Promise.all([api(`/api/schedule?from=${from}&to=${to}`), api("/api/users")]);
+    state.settings = schedule.settings;
+    state.bookings = schedule.bookings;
+    state.users = users.users;
+    renderAll();
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+}
+
+function renderAll() {
+  renderTimeOptions();
+  renderTreatmentTypes();
+  renderTherapists();
+  renderCalendar();
+  renderLists();
+}
+
+function renderTimeOptions() {
+  els.bookingStart.innerHTML = "";
+  for (let hour = state.settings.openingHour; hour < state.settings.closingHour; hour += 1) {
+    const option = document.createElement("option");
+    option.value = `${String(hour).padStart(2, "0")}:00`;
+    option.textContent = option.value;
+    els.bookingStart.append(option);
+  }
+}
+
+function renderTreatmentTypes() {
+  const types = state.settings.treatmentTypes?.length ? state.settings.treatmentTypes : ["וואטסו", "הידרו", "קבוצות", "שחייה", "אחר"];
+  els.treatmentType.innerHTML = types.map((type) => `<option value="${type}">${type}</option>`).join("");
+}
+
+function renderTherapists() {
+  const therapists = state.users.filter((user) => user.role === "therapist");
+  els.bookingTherapist.innerHTML = therapists.map((user) => `<option value="${user.id}">${user.name}</option>`).join("");
+  els.therapistField.classList.toggle("hidden", state.user.role !== "admin");
+  els.approveNowField.classList.toggle("hidden", state.user.role !== "admin");
+}
+
+function bookingsForSlot(date, start) {
+  return state.bookings.filter((booking) => booking.date === date && booking.start === start && ["pending", "approved"].includes(booking.status));
+}
+
+function bookingCard(booking, compact = false) {
+  const item = document.createElement("article");
+  item.className = `booking-card ${booking.status}`;
+  item.innerHTML = `
+    <strong>${booking.therapistName}</strong>
+    <span class="type-badge">${booking.treatmentType || "הידרו"}</span>
+    <span>${booking.date} ${booking.start}-${booking.end}</span>
+    ${booking.patientName ? `<span>${booking.patientName}</span>` : ""}
+    <small>${statusText(booking.status)}</small>
+  `;
+  const actions = document.createElement("div");
+  actions.className = "card-actions";
+  if (state.user.role === "admin" && booking.status === "pending") {
+    actions.append(actionButton("אישור", () => approveBooking(booking.id), "primary small"));
+    actions.append(actionButton("דחייה", () => rejectBooking(booking.id), "small"));
+  }
+  if ((state.user.role === "admin" && booking.status === "approved") || (state.user.id === booking.therapistId && booking.status === "pending")) {
+    actions.append(actionButton("ביטול", () => cancelBooking(booking.id), "danger small"));
+  }
+  if (actions.children.length && !compact) item.append(actions);
+  return item;
+}
+
+function actionButton(text, onClick, className = "") {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.textContent = text;
+  button.className = className;
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function renderCalendar() {
+  const days = Array.from({ length: 7 }, (_, index) => addDays(state.weekStart, index));
+  els.weekTitle.textContent = `שבוע ${formatDate(days[0])} - ${formatDate(days[6])}`;
+  const hours = [];
+  for (let hour = state.settings.openingHour; hour < state.settings.closingHour; hour += 1) hours.push(`${String(hour).padStart(2, "0")}:00`);
+  els.calendar.innerHTML = "";
+  const grid = document.createElement("div");
+  grid.className = "calendar-grid";
+  grid.style.setProperty("--days", String(days.length));
+  grid.append(headerCell("שעה", "time-head"));
+  days.forEach((day) => grid.append(dayHeader(day)));
+  hours.forEach((hour) => {
+    grid.append(headerCell(hour, "time-cell"));
+    days.forEach((day) => {
+      const date = isoDate(day);
+      const cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "slot";
+      const bookings = bookingsForSlot(date, hour);
+      if (bookings.length) {
+        cell.classList.add(bookings[0].status);
+        cell.append(bookingCard(bookings[0], true));
+      } else {
+        cell.innerHTML = "<span>פנוי</span>";
+      }
+      cell.addEventListener("click", () => openBookingDialog(date, hour));
+      grid.append(cell);
+    });
+  });
+  els.calendar.append(grid);
+  els.pendingCount.textContent = state.bookings.filter((booking) => booking.status === "pending").length;
+  els.approvedCount.textContent = state.bookings.filter((booking) => booking.status === "approved").length;
+}
+
+function headerCell(text, className) {
+  const cell = document.createElement("div");
+  cell.className = className;
+  cell.textContent = text;
+  return cell;
+}
+
+function dayHeader(day) {
+  const holiday = holidayFor(day);
+  const isSaturday = day.getDay() === 6;
+  const cell = document.createElement("div");
+  cell.className = "day-head";
+  if (isSaturday) cell.classList.add("saturday");
+  if (holiday) cell.classList.add("holiday");
+  cell.innerHTML = `<span>${formatFullDate(day)}</span>${isSaturday ? "<small>שבת</small>" : ""}${holiday ? `<small>${holiday.name}</small>` : ""}`;
+  return cell;
+}
+
+function renderLists() {
+  renderBookingList(els.pendingList, state.bookings.filter((booking) => booking.status === "pending"), "אין בקשות שממתינות לאישור.");
+  const mine = state.bookings.filter((booking) => booking.therapistId === state.user.id || state.user.role === "admin");
+  renderBookingList(els.myBookings, mine, "אין זימונים לשבוע הזה.");
+}
+
+function renderBookingList(target, bookings, emptyText) {
+  target.innerHTML = "";
+  if (!bookings.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty";
+    empty.textContent = emptyText;
+    target.append(empty);
+    return;
+  }
+  bookings.forEach((booking) => target.append(bookingCard(booking)));
+}
+
+function openBookingDialog(date = isoDate(new Date()), start = "08:00") {
+  if (bookingsForSlot(date, start).length) {
+    setStatus("השעה הזו כבר תפוסה או ממתינה לאישור.", true);
+    return;
+  }
+  els.bookingForm.reset();
+  els.bookingDate.value = date;
+  els.bookingStart.value = start;
+  if (state.user.role === "admin") {
+    const firstTherapist = state.users.find((user) => user.role === "therapist");
+    els.bookingTherapist.value = firstTherapist?.id || "";
+  }
+  els.bookingDialog.showModal();
+}
+
+async function submitBooking(event) {
+  event.preventDefault();
+  const payload = Object.fromEntries(new FormData(els.bookingForm).entries());
+  payload.approveNow = els.approveNow.checked;
+  try {
+    await api("/api/bookings", { method: "POST", body: JSON.stringify(payload) });
+    els.bookingDialog.close();
+    await loadData();
+    setStatus(payload.approveNow ? "הזימון נשמר ואושר." : "בקשת הזימון נשלחה לאישור מנהל.");
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+}
+
+async function approveBooking(id) {
+  await api(`/api/bookings/${id}/approve`, { method: "POST" });
+  await loadData();
+  setStatus("הזימון אושר.");
+}
+
+async function rejectBooking(id) {
+  await api(`/api/bookings/${id}/reject`, { method: "POST" });
+  await loadData();
+  setStatus("הבקשה נדחתה.");
+}
+
+async function cancelBooking(id) {
+  await api(`/api/bookings/${id}/cancel`, { method: "POST" });
+  await loadData();
+  setStatus("הזימון בוטל.");
+}
+
+document.querySelector("#prevWeekBtn").addEventListener("click", () => { state.weekStart = addDays(state.weekStart, -7); loadData(); });
+document.querySelector("#nextWeekBtn").addEventListener("click", () => { state.weekStart = addDays(state.weekStart, 7); loadData(); });
+document.querySelector("#todayBtn").addEventListener("click", () => { state.weekStart = startOfWeek(new Date()); loadData(); });
+document.querySelector("#newBookingBtn").addEventListener("click", () => openBookingDialog());
+document.querySelector("#logoutBtn").addEventListener("click", () => { localStorage.removeItem("poolUser"); state.user = null; showApp(); });
+document.querySelector("#closeDialogBtn").addEventListener("click", () => els.bookingDialog.close());
+els.loginForm.addEventListener("submit", login);
+els.bookingForm.addEventListener("submit", submitBooking);
+showApp();
