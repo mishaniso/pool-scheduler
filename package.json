@@ -1,0 +1,13 @@
+{
+  "name": "pool-scheduler",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Therapeutic pool scheduling and booking approval system.",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

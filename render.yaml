@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: pool-scheduler
+    env: node
+    plan: free
+    buildCommand: "npm install"
+    startCommand: "npm start"
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: DISPLAY_TIME_ZONE
+        value: Asia/Jerusalem
