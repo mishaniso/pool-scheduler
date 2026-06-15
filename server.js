@@ -1,5 +1,6 @@
 const http = require("http");
 const https = require("https");
+const tls = require("tls");
 const fs = require("fs/promises");
 const path = require("path");
 const crypto = require("crypto");
@@ -88,6 +89,16 @@ function emailHtml(setupLink, isReset = false) {
   `;
 }
 
+function encodeHeader(value) {
+  return `=?UTF-8?B?${Buffer.from(value, "utf8").toString("base64")}?=`;
+}
+
+function emailFromHeader() {
+  const address = process.env.EMAIL_FROM || process.env.SMTP_USER || "";
+  const name = process.env.EMAIL_FROM_NAME || "בריכה טיפולית";
+  return `${encodeHeader(name)} <${address}>`;
+}
+
 function postJson(hostname, pathName, headers, payload) {
   const body = JSON.stringify(payload);
   return new Promise((resolve, reject) => {
@@ -115,7 +126,91 @@ function postJson(hostname, pathName, headers, payload) {
   });
 }
 
+function smtpCommand(socket, command, expectedCodes) {
+  return new Promise((resolve, reject) => {
+    let response = "";
+    const cleanup = () => {
+      socket.off("data", onData);
+      socket.off("error", onError);
+    };
+    const onError = (error) => {
+      cleanup();
+      reject(error);
+    };
+    const onData = (chunk) => {
+      response += chunk.toString("utf8");
+      const lines = response.split(/\r?\n/).filter(Boolean);
+      const last = lines[lines.length - 1] || "";
+      if (!/^\d{3} /.test(last)) return;
+      cleanup();
+      const code = Number(last.slice(0, 3));
+      if (expectedCodes.includes(code)) resolve(response);
+      else reject(new Error(`SMTP command failed (${code}): ${response}`));
+    };
+    socket.on("data", onData);
+    socket.on("error", onError);
+    if (command) socket.write(`${command}\r\n`);
+  });
+}
+
+async function sendSmtpEmail(user, setupLink, isReset = false) {
+  const host = process.env.SMTP_HOST || "smtp.gmail.com";
+  const port = Number(process.env.SMTP_PORT || 465);
+  const username = process.env.SMTP_USER;
+  const password = process.env.SMTP_PASS;
+  const fromAddress = process.env.EMAIL_FROM || username;
+  if (!username || !password || !fromAddress) return { sent: false, reason: "missing-email-config" };
+
+  const subject = isReset ? "איפוס סיסמה למערכת הבריכה הטיפולית" : "הזמנה למערכת הבריכה הטיפולית";
+  const boundary = `pool-${crypto.randomBytes(12).toString("hex")}`;
+  const message = [
+    `From: ${emailFromHeader()}`,
+    `To: ${user.email}`,
+    `Subject: ${encodeHeader(subject)}`,
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
+    "Content-Type: text/plain; charset=UTF-8",
+    "Content-Transfer-Encoding: 8bit",
+    "",
+    emailText(setupLink, isReset),
+    `--${boundary}`,
+    "Content-Type: text/html; charset=UTF-8",
+    "Content-Transfer-Encoding: 8bit",
+    "",
+    emailHtml(setupLink, isReset),
+    `--${boundary}--`,
+    "."
+  ].join("\r\n");
+
+  const socket = tls.connect({ host, port, servername: host });
+  try {
+    await smtpCommand(socket, null, [220]);
+    await smtpCommand(socket, `EHLO ${process.env.SMTP_EHLO || "pool-scheduler.local"}`, [250]);
+    await smtpCommand(socket, "AUTH LOGIN", [334]);
+    await smtpCommand(socket, Buffer.from(username).toString("base64"), [334]);
+    await smtpCommand(socket, Buffer.from(password).toString("base64"), [235]);
+    await smtpCommand(socket, `MAIL FROM:<${fromAddress}>`, [250]);
+    await smtpCommand(socket, `RCPT TO:<${user.email}>`, [250, 251]);
+    await smtpCommand(socket, "DATA", [354]);
+    await smtpCommand(socket, message, [250]);
+    await smtpCommand(socket, "QUIT", [221]);
+    return { sent: true, provider: "smtp" };
+  } finally {
+    socket.destroy();
+  }
+}
+
 async function sendInviteEmail(user, setupLink, isReset = false) {
+  if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+    try {
+      return await sendSmtpEmail(user, setupLink, isReset);
+    } catch (error) {
+      console.error("SMTP invite email failed:", error.message);
+      return { sent: false, reason: "email-provider-error" };
+    }
+  }
   if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) {
     return { sent: false, reason: "missing-email-config" };
   }
