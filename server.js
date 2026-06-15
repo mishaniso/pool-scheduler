@@ -33,6 +33,14 @@ function localDateKey(date) {
   return `${year}-${month}-${day}`;
 }
 
+function dateKeyInTimeZone(date = new Date(), timeZone = "Asia/Jerusalem") {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return `${year}-${month}-${day}`;
+}
+
 function holidayNameForHebrewDate(month, day) {
   const normalizedMonth = month === "Adar II" ? "Adar" : month;
   const holidays = {
@@ -284,6 +292,11 @@ function validateSlot(db, date, start, ignoreId = "", requestedEnd = "") {
     error.status = 400;
     throw error;
   }
+  if (date < dateKeyInTimeZone()) {
+    const error = new Error("לא ניתן להזמין תאריך שכבר עבר.");
+    error.status = 400;
+    throw error;
+  }
   const startTotal = hour * 60 + minute;
   const endTotal = requestedEnd ? timeToMinutes(requestedEnd) : startTotal + db.settings.slotMinutes;
   const openTotal = db.settings.openingHour * 60;
@@ -439,6 +452,39 @@ async function listSchedule(req, url) {
   return { settings: db.settings, bookings };
 }
 
+async function therapistReport(req, url) {
+  const db = await readJson(DB_FILE, defaultDb);
+  requireAdmin(req, db);
+  const from = url.searchParams.get("from") || "";
+  const to = url.searchParams.get("to") || "";
+  const therapists = db.users.filter((user) => user.role === "therapist");
+  const rows = therapists.map((therapist) => {
+    const entries = db.bookings
+      .filter((booking) => booking.therapistId === therapist.id && booking.status === "approved")
+      .filter((booking) => (!from || booking.date >= from) && (!to || booking.date <= to))
+      .sort((a, b) => `${a.date} ${a.start}`.localeCompare(`${b.date} ${b.start}`))
+      .map((booking) => ({
+        id: booking.id,
+        date: booking.date,
+        start: booking.start,
+        end: booking.end,
+        treatmentType: booking.treatmentType,
+        patientName: booking.patientName,
+        minutes: bookingEndMinutes(booking, db.settings.slotMinutes) - timeToMinutes(booking.start)
+      }));
+    const totalMinutes = entries.reduce((sum, entry) => sum + entry.minutes, 0);
+    return {
+      therapistId: therapist.id,
+      therapistName: therapist.name,
+      totalMinutes,
+      totalHours: Number((totalMinutes / 60).toFixed(2)),
+      bookingCount: entries.length,
+      entries
+    };
+  }).sort((a, b) => b.totalMinutes - a.totalMinutes);
+  return { from, to, rows };
+}
+
 async function createBooking(req, body) {
   const db = await readJson(DB_FILE, defaultDb);
   const user = requireUser(req, db);
@@ -541,6 +587,7 @@ async function handleApi(req, res) {
   if (req.method === "PUT" && parts[0] === "api" && parts[1] === "users" && parts[2]) return send(res, 200, await updateUser(req, parts[2], await parseBody(req)));
   if (req.method === "DELETE" && parts[0] === "api" && parts[1] === "users" && parts[2]) return send(res, 200, await deleteUser(req, parts[2]));
   if (req.method === "GET" && url.pathname === "/api/schedule") return send(res, 200, await listSchedule(req, url));
+  if (req.method === "GET" && url.pathname === "/api/reports/therapists") return send(res, 200, await therapistReport(req, url));
   if (req.method === "POST" && url.pathname === "/api/bookings") return send(res, 200, await createBooking(req, await parseBody(req)));
   if (req.method === "POST" && parts[0] === "api" && parts[1] === "bookings" && parts[2] && parts[3] === "approve") return send(res, 200, await approveBooking(req, parts[2]));
   if (req.method === "POST" && parts[0] === "api" && parts[1] === "bookings" && parts[2] && parts[3] === "cancel") return send(res, 200, await updateBookingStatus(req, parts[2], "cancelled"));

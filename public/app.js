@@ -3,6 +3,7 @@ const state = {
   users: [],
   settings: { openingHour: 7, closingHour: 22, slotMinutes: 15, treatmentTypes: [], holidays: [] },
   bookings: [],
+  report: { rows: [] },
   weekStart: startOfWeek(new Date()),
   selectedDate: isoDate(new Date())
 };
@@ -39,7 +40,11 @@ const els = {
   backToScheduleBtn: document.querySelector("#backToScheduleBtn"),
   scheduleScreen: document.querySelector("#scheduleScreen"),
   userAdminScreen: document.querySelector("#userAdminScreen"),
-  newBookingBtn: document.querySelector("#newBookingBtn")
+  newBookingBtn: document.querySelector("#newBookingBtn"),
+  reportFrom: document.querySelector("#reportFrom"),
+  reportTo: document.querySelector("#reportTo"),
+  refreshReportBtn: document.querySelector("#refreshReportBtn"),
+  therapistReport: document.querySelector("#therapistReport")
 };
 
 function startOfWeek(date) {
@@ -60,6 +65,14 @@ function isoDate(date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function todayKey() {
+  return isoDate(new Date());
+}
+
+function isPastDateKey(date) {
+  return date < todayKey();
 }
 
 function formatDate(date) {
@@ -102,6 +115,7 @@ function holidayFor(date) {
 
 function blockedReasonForDay(date) {
   const holiday = holidayFor(date);
+  if (isPastDateKey(isoDate(date))) return "תאריך שעבר";
   if (date.getDay() === 5) return "יום שישי";
   if (date.getDay() === 6) return "שבת";
   return holiday?.name || "";
@@ -218,6 +232,7 @@ function renderAll() {
   renderCalendar();
   renderLists();
   renderUserAdmin();
+  renderReport();
 }
 
 function showScreen(screen) {
@@ -228,6 +243,7 @@ function showScreen(screen) {
   els.usersMobileBtn.classList.toggle("hidden", isUsers || state.user?.role !== "admin");
   els.usersNavLink.classList.toggle("active", isUsers);
   document.querySelector('.workspace-nav a[href="#calendar"]')?.classList.toggle("active", !isUsers);
+  if (isUsers) loadReport();
 }
 
 function renderTimeOptions() {
@@ -292,6 +308,14 @@ function bookingConflictsForRange(date, start, end) {
     if (booking.date !== date || !["pending", "approved"].includes(booking.status)) return false;
     return rangesOverlap(rangeStart, rangeEnd, timeToMinutes(booking.start), bookingEndMinutes(booking));
   });
+}
+
+function isBookingStartAt(booking, hour) {
+  return booking.start === hour;
+}
+
+function isBookingEndAt(booking, hour) {
+  return bookingEndMinutes(booking) === timeToMinutes(hour) + Number(state.settings.slotMinutes || 15);
 }
 
 function bookingCard(booking, compact = false) {
@@ -365,9 +389,12 @@ function renderCalendar() {
       cell.setAttribute("aria-label", `${formatFullDate(day)}, שעה ${hour}`);
       const bookings = bookingsForSlot(date, hour);
       if (bookings.length) {
-        cell.classList.add(bookings[0].status);
-        if (bookings[0].start !== hour) cell.classList.add("continues-booking");
-        cell.append(bookingCard(bookings[0], true));
+        const booking = bookings[0];
+        cell.classList.add(booking.status, "range-block");
+        if (isBookingStartAt(booking, hour)) cell.classList.add("range-start");
+        if (isBookingEndAt(booking, hour)) cell.classList.add("range-end");
+        if (!isBookingStartAt(booking, hour)) cell.classList.add("continues-booking");
+        if (isBookingStartAt(booking, hour)) cell.append(bookingCard(booking, true));
       } else if (blockReason) {
         cell.classList.add("blocked");
         cell.disabled = true;
@@ -425,10 +452,14 @@ function renderMobileSchedule(days, hours) {
       item.type = "button";
       item.className = "mobile-slot";
       if (bookings.length) {
-        item.classList.add(bookings[0].status);
-        if (bookings[0].start !== hour) item.classList.add("continues-booking");
+        const booking = bookings[0];
+        item.classList.add(booking.status, "range-block");
+        if (isBookingStartAt(booking, hour)) item.classList.add("range-start");
+        if (isBookingEndAt(booking, hour)) item.classList.add("range-end");
+        if (!isBookingStartAt(booking, hour)) item.classList.add("continues-booking");
         item.disabled = true;
-        item.append(bookingCard(bookings[0], true));
+        if (isBookingStartAt(booking, hour)) item.append(bookingCard(booking, true));
+        else item.innerHTML = `<span class="mobile-slot-time">${hour}</span><strong>תפוס</strong><small>${booking.start}-${booking.end}</small>`;
       } else {
         item.innerHTML = `<span class="mobile-slot-time">${hour}</span><strong>פנוי</strong><small>לחץ לזימון</small>`;
         item.addEventListener("click", () => openBookingDialog(selectedDate, hour));
@@ -510,6 +541,55 @@ function renderUserAdmin() {
   });
 }
 
+async function loadReport() {
+  if (state.user?.role !== "admin") return;
+  const params = new URLSearchParams();
+  if (els.reportFrom.value) params.set("from", els.reportFrom.value);
+  if (els.reportTo.value) params.set("to", els.reportTo.value);
+  try {
+    state.report = await api(`/api/reports/therapists?${params.toString()}`);
+    renderReport();
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+}
+
+function formatHours(minutes) {
+  const hours = minutes / 60;
+  return `${hours.toFixed(hours % 1 === 0 ? 0 : 2)} שעות`;
+}
+
+function renderReport() {
+  if (!els.therapistReport || state.user?.role !== "admin") return;
+  const rows = state.report?.rows || [];
+  els.therapistReport.innerHTML = "";
+  if (!rows.length) {
+    els.therapistReport.innerHTML = `<div class="empty"><strong>אין שעות טיפול מאושרות להצגה.</strong><span>לאחר אישור זימונים, הסיכום יופיע כאן.</span></div>`;
+    return;
+  }
+  rows.forEach((row) => {
+    const item = document.createElement("details");
+    item.className = "report-row";
+    item.innerHTML = `
+      <summary>
+        <strong>${escapeHtml(row.therapistName)}</strong>
+        <span>${formatHours(row.totalMinutes)}</span>
+        <small>${row.bookingCount} טיפולים</small>
+      </summary>
+      <div class="report-details">
+        ${row.entries.length ? row.entries.map((entry) => `
+          <article class="report-entry">
+            <strong>${escapeHtml(entry.date)} · ${escapeHtml(entry.start)}-${escapeHtml(entry.end)}</strong>
+            <span>${escapeHtml(entry.treatmentType || "")}${entry.patientName ? ` · ${escapeHtml(entry.patientName)}` : ""}</span>
+            <small>${formatHours(entry.minutes)}</small>
+          </article>
+        `).join("") : `<div class="empty"><strong>אין טיפולים מאושרים.</strong></div>`}
+      </div>
+    `;
+    els.therapistReport.append(item);
+  });
+}
+
 function openBookingDialog(date = isoDate(new Date()), start = "08:00") {
   if (state.user.role === "viewer") {
     setStatus("משתמש צפייה בלבד לא יכול ליצור זימון.", true);
@@ -526,6 +606,7 @@ function openBookingDialog(date = isoDate(new Date()), start = "08:00") {
     return;
   }
   els.bookingForm.reset();
+  els.bookingDate.min = todayKey();
   els.bookingDate.value = date;
   els.bookingStart.value = start;
   renderEndTimeOptions();
@@ -649,6 +730,7 @@ document.querySelector("#closeDialogBtn").addEventListener("click", () => els.bo
 els.loginForm.addEventListener("submit", login);
 els.bookingForm.addEventListener("submit", submitBooking);
 els.bookingStart.addEventListener("change", renderEndTimeOptions);
+els.refreshReportBtn.addEventListener("click", loadReport);
 els.userForm.addEventListener("submit", submitUser);
 els.usersAdminList.addEventListener("click", handleUsersListClick);
 showApp();

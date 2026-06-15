@@ -101,10 +101,24 @@
           <div class="admin-screen-head">
             <div>
               <h2>ניהול משתמשים</h2>
-              <p>הקמה, מחיקה ושינוי הרשאות למשתמשים במערכת.</p>
+              <p>הקמה, מחיקה, שינוי הרשאות ודוח שעות טיפול לפי מטפל.</p>
             </div>
             <button id="backToScheduleBtn" type="button">חזרה ללוח</button>
           </div>
+          <section id="therapistReportPanel" class="panel report-panel">
+            <div class="report-head">
+              <div>
+                <h2>דוח שעות טיפול</h2>
+                <p>סיכום שעות מאושרות לפי מטפל, עם פירוט הזימונים.</p>
+              </div>
+              <div class="report-filters">
+                <label>מתאריך <input id="reportFrom" type="date" /></label>
+                <label>עד תאריך <input id="reportTo" type="date" /></label>
+                <button id="refreshReportBtn" type="button">רענון</button>
+              </div>
+            </div>
+            <div id="therapistReport" class="therapist-report"></div>
+          </section>
           <section id="userAdminPanel" class="panel user-admin-panel hidden">
             <form id="userForm" class="user-form">
               <label>שם מלא <input id="newUserName" name="name" type="text" required /></label>

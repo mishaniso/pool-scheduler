@@ -106,7 +106,11 @@ h2 { font-size: 20px; }
 .slot > small { justify-self: center; color: var(--muted); font-size: 12px; }
 .slot.pending { background: var(--pending-soft); }
 .slot.approved { background: var(--approved-soft); }
-.slot.continues-booking { box-shadow: inset 0 3px 0 rgba(0, 115, 234, 0.22); }
+.slot.range-block { border-bottom-color: transparent; }
+.slot.range-start { padding-bottom: 0; }
+.slot.range-end { border-bottom-color: var(--monday-line); padding-top: 0; }
+.slot.continues-booking { box-shadow: inset 7px 0 0 var(--monday-blue); }
+.slot.continues-booking::before { content: ""; display: block; min-height: 100%; border-right: 7px solid var(--monday-blue); border-radius: 0; background: rgba(0, 200, 117, 0.08); }
 .slot.blocked { cursor: not-allowed; background: #f7f2ec; color: #765315; }
 .slot.blocked > span { border-style: solid; border-color: #f0c47a; color: #765315; background: #fff8ea; }
 .slot:disabled { opacity: 1; }
@@ -160,6 +164,18 @@ h2 { font-size: 20px; }
 .empty span { font-size: 13px; line-height: 1.45; }
 
 .user-admin-panel { display: grid; gap: 16px; }
+.report-panel { display: grid; gap: 16px; }
+.report-head { display: flex; justify-content: space-between; gap: 16px; align-items: end; }
+.report-head p { margin: 4px 0 0; color: var(--muted); font-weight: 700; }
+.report-filters { display: grid; grid-template-columns: repeat(3, minmax(120px, auto)); gap: 10px; align-items: end; }
+.therapist-report { display: grid; gap: 10px; }
+.report-row { border: 1px solid var(--line); border-radius: 8px; background: #fff; overflow: hidden; }
+.report-row summary { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 14px; cursor: pointer; font-weight: 800; }
+.report-row summary span { color: var(--monday-blue); }
+.report-row summary small { color: var(--muted); }
+.report-details { display: grid; gap: 8px; padding: 0 14px 14px; }
+.report-entry { display: grid; gap: 3px; padding: 10px; border-radius: 8px; background: #f8f9fd; }
+.report-entry span, .report-entry small { color: var(--muted); font-weight: 700; }
 .user-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .user-form button { align-self: end; }
 .users-admin-list { display: grid; gap: 10px; }
