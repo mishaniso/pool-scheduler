@@ -1,5 +1,6 @@
 const state = {
   user: JSON.parse(localStorage.getItem("poolUser") || "null"),
+  setupToken: new URLSearchParams(location.search).get("setup"),
   users: [],
   settings: { openingHour: 7, closingHour: 22, slotMinutes: 15, treatmentTypes: [], holidays: [] },
   bookings: [],
@@ -10,6 +11,13 @@ const state = {
 
 const els = {
   loginView: document.querySelector("#loginView"),
+  setupView: document.querySelector("#setupView"),
+  setupForm: document.querySelector("#setupForm"),
+  setupIntro: document.querySelector("#setupIntro"),
+  setupName: document.querySelector("#setupName"),
+  setupPassword: document.querySelector("#setupPassword"),
+  setupPasswordConfirm: document.querySelector("#setupPasswordConfirm"),
+  setupStatus: document.querySelector("#setupStatus"),
   appView: document.querySelector("#appView"),
   loginForm: document.querySelector("#loginForm"),
   loginStatus: document.querySelector("#loginStatus"),
@@ -34,6 +42,7 @@ const els = {
   approveNow: document.querySelector("#approveNow"),
   userAdminPanel: document.querySelector("#userAdminPanel"),
   userForm: document.querySelector("#userForm"),
+  inviteResult: document.querySelector("#inviteResult"),
   usersAdminList: document.querySelector("#usersAdminList"),
   usersNavLink: document.querySelector("#usersNavLink"),
   usersMobileBtn: document.querySelector("#usersMobileBtn"),
@@ -161,6 +170,10 @@ function rangesOverlap(startA, endA, startB, endB) {
   return startA < endB && startB < endA;
 }
 
+function userSetupStatusText(user) {
+  return user.setupRequired ? "ממתין להגדרה" : "פעיל";
+}
+
 function roleText(role) {
   return { admin: "מנהל/ת", therapist: "מטפל/ת", viewer: "צפייה בלבד" }[role] || role;
 }
@@ -183,8 +196,18 @@ async function api(path, options = {}) {
 }
 
 function showApp() {
+  if (state.setupToken) {
+    els.loginView.classList.add("hidden");
+    els.appView.classList.add("hidden");
+    els.setupView.classList.remove("hidden");
+    localStorage.removeItem("poolUser");
+    state.user = null;
+    loadSetupToken();
+    return;
+  }
   const loggedIn = Boolean(state.user);
   els.loginView.classList.toggle("hidden", loggedIn);
+  els.setupView.classList.add("hidden");
   els.appView.classList.toggle("hidden", !loggedIn);
   if (loggedIn) {
     els.userName.textContent = `${state.user.name} (${roleText(state.user.role)})`;
@@ -193,6 +216,56 @@ function showApp() {
     showScreen("schedule");
     loadData();
   }
+}
+
+async function loadSetupToken() {
+  try {
+    const data = await api("/api/setup-token", { method: "POST", body: JSON.stringify({ token: state.setupToken }) });
+    els.setupIntro.textContent = `החשבון ${data.email} מוכן להגדרה. בחר/י שם משתמש וסיסמה אישית.`;
+    els.setupName.value = data.name || "";
+  } catch (error) {
+    els.setupStatus.textContent = error.message;
+  }
+}
+
+async function submitSetup(event) {
+  event.preventDefault();
+  els.setupStatus.textContent = "";
+  if (els.setupPassword.value !== els.setupPasswordConfirm.value) {
+    els.setupStatus.textContent = "הסיסמאות אינן תואמות.";
+    return;
+  }
+  try {
+    const data = await api("/api/setup-complete", {
+      method: "POST",
+      body: JSON.stringify({ token: state.setupToken, name: els.setupName.value, password: els.setupPassword.value })
+    });
+    state.user = data.user;
+    localStorage.setItem("poolUser", JSON.stringify(state.user));
+    state.setupToken = null;
+    history.replaceState({}, "", location.pathname);
+    showApp();
+  } catch (error) {
+    els.setupStatus.textContent = error.message;
+  }
+}
+
+function renderInviteResult({ setupUrl, user }, title = "קישור ההזמנה נוצר") {
+  if (!setupUrl || !els.inviteResult) return;
+  const subject = encodeURIComponent("הגדרת חשבון למערכת הבריכה הטיפולית");
+  const body = encodeURIComponent(`שלום,\n\nנפתח עבורך חשבון במערכת הבריכה הטיפולית.\nלהגדרת שם משתמש וסיסמה אישית יש ללחוץ על הקישור:\n${setupUrl}\n\nהקישור תקף ל-7 ימים.`);
+  els.inviteResult.classList.remove("hidden");
+  els.inviteResult.innerHTML = `
+    <div>
+      <strong>${title}</strong>
+      <span>${escapeHtml(user?.email || "")}</span>
+    </div>
+    <input class="setup-link-input" type="text" readonly value="${escapeHtml(setupUrl)}" aria-label="קישור הגדרת חשבון" />
+    <div class="invite-actions">
+      <button type="button" class="small" data-copy-setup-link>העתקת קישור</button>
+      <a class="button-link" href="mailto:${encodeURIComponent(user?.email || "")}?subject=${subject}&body=${body}">פתיחת מייל למשתמש</a>
+    </div>
+  `;
 }
 
 async function login(event) {
@@ -541,6 +614,7 @@ function renderUserAdmin() {
         <strong>${escapeHtml(user.name)}</strong>
         <span>${escapeHtml(user.email)}</span>
         ${user.phone ? `<small>${escapeHtml(user.phone)}</small>` : ""}
+        <em class="user-state ${user.setupRequired ? "pending" : "active"}">${userSetupStatusText(user)}</em>
       </div>
       <label>הרשאה
         <select data-role-for="${user.id}">
@@ -551,6 +625,7 @@ function renderUserAdmin() {
       </label>
       <div class="user-row-actions">
         <button type="button" class="small" data-save-user="${user.id}">שמירה</button>
+        <button type="button" class="small" data-reset-user="${user.id}">איפוס סיסמה</button>
         <button type="button" class="danger small" data-delete-user="${user.id}">מחיקה</button>
       </div>
     `;
@@ -716,11 +791,55 @@ async function deleteUser(id) {
   }
 }
 
+async function submitInviteUser(event) {
+  event.preventDefault();
+  const payload = Object.fromEntries(new FormData(els.userForm).entries());
+  try {
+    const data = await api("/api/users", { method: "POST", body: JSON.stringify(payload) });
+    els.userForm.reset();
+    await loadData();
+    renderInviteResult(data);
+    setStatus("המשתמש הוזמן. יש לשלוח לו את קישור ההגדרה.");
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+}
+
+async function resetUserPassword(id) {
+  const user = state.users.find((candidate) => candidate.id === id);
+  if (!user || !confirm(`לאפס סיסמה עבור ${user.name}? המשתמש יקבל קישור חדש ויידרש להגדיר סיסמה מחדש.`)) return;
+  try {
+    const data = await api(`/api/users/${id}/reset-password`, { method: "POST" });
+    await loadData();
+    renderInviteResult(data, "קישור איפוס סיסמה נוצר");
+    setStatus("נוצר קישור איפוס סיסמה חדש.");
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+}
+
+async function copySetupLink() {
+  const input = els.inviteResult?.querySelector(".setup-link-input");
+  if (!input) return;
+  try {
+    await navigator.clipboard.writeText(input.value);
+    setStatus("הקישור הועתק.");
+  } catch {
+    input.select();
+    document.execCommand("copy");
+    setStatus("הקישור הועתק.");
+  }
+}
+
 function handleUsersListClick(event) {
   const saveButton = event.target.closest("[data-save-user]");
   const deleteButton = event.target.closest("[data-delete-user]");
+  const resetButton = event.target.closest("[data-reset-user]");
+  const copyButton = event.target.closest("[data-copy-setup-link]");
   if (saveButton) saveUserRole(saveButton.dataset.saveUser);
   if (deleteButton) deleteUser(deleteButton.dataset.deleteUser);
+  if (resetButton) resetUserPassword(resetButton.dataset.resetUser);
+  if (copyButton) copySetupLink();
 }
 
 document.querySelector("#prevWeekBtn").addEventListener("click", () => {
@@ -749,9 +868,10 @@ els.backToScheduleBtn.addEventListener("click", () => showScreen("schedule"));
 document.querySelector("#logoutBtn").addEventListener("click", () => { localStorage.removeItem("poolUser"); state.user = null; showApp(); });
 document.querySelector("#closeDialogBtn").addEventListener("click", () => els.bookingDialog.close());
 els.loginForm.addEventListener("submit", login);
+els.setupForm.addEventListener("submit", submitSetup);
 els.bookingForm.addEventListener("submit", submitBooking);
 els.bookingStart.addEventListener("change", renderEndTimeOptions);
 els.refreshReportBtn.addEventListener("click", loadReport);
-els.userForm.addEventListener("submit", submitUser);
+els.userForm.addEventListener("submit", submitInviteUser);
 els.usersAdminList.addEventListener("click", handleUsersListClick);
 showApp();

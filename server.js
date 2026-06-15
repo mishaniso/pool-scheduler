@@ -17,6 +17,50 @@ const mimeTypes = {
   ".json": "application/json; charset=utf-8"
 };
 
+function hashPassword(password, salt = crypto.randomBytes(16).toString("hex")) {
+  const hash = crypto.scryptSync(String(password), salt, 64).toString("hex");
+  return `scrypt$${salt}$${hash}`;
+}
+
+function verifyPassword(password, stored) {
+  if (!stored?.startsWith("scrypt$")) return false;
+  const [, salt, hash] = stored.split("$");
+  const expected = Buffer.from(hash || "", "hex");
+  const actual = Buffer.from(hashPassword(password, salt).split("$")[2], "hex");
+  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
+}
+
+function hashToken(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function createSetupToken(user) {
+  const token = crypto.randomBytes(32).toString("hex");
+  user.setupTokenHash = hashToken(token);
+  user.setupTokenExpiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString();
+  user.setupRequired = true;
+  return token;
+}
+
+function appBaseUrl(req) {
+  if (process.env.APP_BASE_URL) return process.env.APP_BASE_URL;
+  const host = req.headers.host || `localhost:${PORT}`;
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  const proto = forwardedProto || (host.startsWith("localhost") || host.startsWith("127.0.0.1") ? "http" : "https");
+  return `${proto}://${host}`;
+}
+
+function setupUrl(req, token) {
+  return `${appBaseUrl(req)}/?setup=${encodeURIComponent(token)}`;
+}
+
+function findUserBySetupToken(db, token) {
+  const tokenHash = hashToken(String(token || ""));
+  const user = db.users.find((candidate) => candidate.setupTokenHash === tokenHash);
+  if (!user || !user.setupTokenExpiresAt || new Date(user.setupTokenExpiresAt).getTime() < Date.now()) return null;
+  return user;
+}
+
 function hebrewDateParts(date) {
   const formatter = new Intl.DateTimeFormat("en-u-ca-hebrew", { day: "numeric", month: "long" });
   const parts = formatter.formatToParts(date);
@@ -207,7 +251,7 @@ async function parseBody(req) {
 }
 
 function publicUser(user) {
-  const { password, ...safeUser } = user;
+  const { password, passwordHash, setupTokenHash, setupTokenExpiresAt, ...safeUser } = user;
   return safeUser;
 }
 
@@ -323,10 +367,16 @@ async function login(body) {
   const db = await readJson(DB_FILE, defaultDb);
   const email = String(body.email || "").trim().toLowerCase();
   const password = String(body.password || "");
-  const user = db.users.find((candidate) => candidate.email.toLowerCase() === email && candidate.password === password);
-  if (!user) {
+  const user = db.users.find((candidate) => candidate.email.toLowerCase() === email);
+  const validPassword = user && (user.passwordHash ? verifyPassword(password, user.passwordHash) : user.password === password);
+  if (!user || !validPassword) {
     const error = new Error("פרטי ההתחברות אינם נכונים.");
     error.status = 401;
+    throw error;
+  }
+  if (user.setupRequired && !user.passwordHash && !user.password) {
+    const error = new Error("יש להשלים הגדרת שם וסיסמה דרך קישור ההזמנה.");
+    error.status = 403;
     throw error;
   }
   return { user: publicUser(user) };
@@ -376,6 +426,21 @@ function normalizeUserInput(body, existing = null) {
   };
 }
 
+function normalizeInviteInput(body) {
+  const email = String(body.email || "").trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    const error = new Error("יש להזין אימייל תקין.");
+    error.status = 400;
+    throw error;
+  }
+  return {
+    name: String(body.name || email.split("@")[0]).trim(),
+    email,
+    role: normalizeRole(body.role),
+    phone: String(body.phone || "").trim()
+  };
+}
+
 function assertCanChangeAdmin(db, targetUser, nextRole = targetUser.role) {
   const activeAdmins = db.users.filter((user) => user.role === "admin" && user.id !== targetUser.id);
   if (targetUser.role === "admin" && nextRole !== "admin" && activeAdmins.length === 0) {
@@ -388,16 +453,17 @@ function assertCanChangeAdmin(db, targetUser, nextRole = targetUser.role) {
 async function createUser(req, body) {
   const db = await readJson(DB_FILE, defaultDb);
   requireAdmin(req, db);
-  const input = normalizeUserInput(body);
+  const input = normalizeInviteInput(body);
   if (db.users.some((user) => user.email.toLowerCase() === input.email)) {
     const error = new Error("כבר קיים משתמש עם האימייל הזה.");
     error.status = 409;
     throw error;
   }
-  const user = { id: crypto.randomUUID(), ...input };
+  const user = { id: crypto.randomUUID(), ...input, setupRequired: true, invitedAt: new Date().toISOString() };
+  const token = createSetupToken(user);
   db.users.push(user);
   await writeJson(DB_FILE, db);
-  return { user: publicUser(user) };
+  return { user: publicUser(user), setupUrl: setupUrl(req, token) };
 }
 
 async function updateUser(req, id, body) {
@@ -420,7 +486,65 @@ async function updateUser(req, id, body) {
   user.email = input.email;
   user.role = input.role;
   user.phone = input.phone;
-  if (input.password) user.password = input.password;
+  await writeJson(DB_FILE, db);
+  return { user: publicUser(user) };
+}
+
+async function resetUserPassword(req, id) {
+  const db = await readJson(DB_FILE, defaultDb);
+  requireAdmin(req, db);
+  const user = db.users.find((candidate) => candidate.id === id);
+  if (!user) {
+    const error = new Error("משתמש לא נמצא.");
+    error.status = 404;
+    throw error;
+  }
+  const token = createSetupToken(user);
+  delete user.password;
+  delete user.passwordHash;
+  user.passwordResetAt = new Date().toISOString();
+  await writeJson(DB_FILE, db);
+  return { user: publicUser(user), setupUrl: setupUrl(req, token) };
+}
+
+async function setupTokenInfo(body) {
+  const db = await readJson(DB_FILE, defaultDb);
+  const user = findUserBySetupToken(db, body.token);
+  if (!user) {
+    const error = new Error("קישור ההגדרה אינו תקין או שפג תוקפו.");
+    error.status = 400;
+    throw error;
+  }
+  return { email: user.email, name: user.name || "", role: user.role };
+}
+
+async function completeSetup(body) {
+  const db = await readJson(DB_FILE, defaultDb);
+  const user = findUserBySetupToken(db, body.token);
+  if (!user) {
+    const error = new Error("קישור ההגדרה אינו תקין או שפג תוקפו.");
+    error.status = 400;
+    throw error;
+  }
+  const name = String(body.name || "").trim();
+  const password = String(body.password || "");
+  if (!name) {
+    const error = new Error("יש להזין שם משתמש.");
+    error.status = 400;
+    throw error;
+  }
+  if (password.length < 6) {
+    const error = new Error("יש לבחור סיסמה באורך 6 תווים לפחות.");
+    error.status = 400;
+    throw error;
+  }
+  user.name = name;
+  user.passwordHash = hashPassword(password);
+  user.setupRequired = false;
+  user.activatedAt = new Date().toISOString();
+  delete user.password;
+  delete user.setupTokenHash;
+  delete user.setupTokenExpiresAt;
   await writeJson(DB_FILE, db);
   return { user: publicUser(user) };
 }
@@ -582,9 +706,12 @@ async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const parts = url.pathname.split("/").filter(Boolean);
   if (req.method === "POST" && url.pathname === "/api/login") return send(res, 200, await login(await parseBody(req)));
+  if (req.method === "POST" && url.pathname === "/api/setup-token") return send(res, 200, await setupTokenInfo(await parseBody(req)));
+  if (req.method === "POST" && url.pathname === "/api/setup-complete") return send(res, 200, await completeSetup(await parseBody(req)));
   if (req.method === "GET" && url.pathname === "/api/users") return send(res, 200, await listUsers(req));
   if (req.method === "POST" && url.pathname === "/api/users") return send(res, 200, await createUser(req, await parseBody(req)));
   if (req.method === "PUT" && parts[0] === "api" && parts[1] === "users" && parts[2]) return send(res, 200, await updateUser(req, parts[2], await parseBody(req)));
+  if (req.method === "POST" && parts[0] === "api" && parts[1] === "users" && parts[2] && parts[3] === "reset-password") return send(res, 200, await resetUserPassword(req, parts[2]));
   if (req.method === "DELETE" && parts[0] === "api" && parts[1] === "users" && parts[2]) return send(res, 200, await deleteUser(req, parts[2]));
   if (req.method === "GET" && url.pathname === "/api/schedule") return send(res, 200, await listSchedule(req, url));
   if (req.method === "GET" && url.pathname === "/api/reports/therapists") return send(res, 200, await therapistReport(req, url));

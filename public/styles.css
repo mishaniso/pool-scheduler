@@ -176,13 +176,23 @@ h2 { font-size: 20px; }
 .report-details { display: grid; gap: 8px; padding: 0 14px 14px; }
 .report-entry { display: grid; gap: 3px; padding: 10px; border-radius: 8px; background: #f8f9fd; }
 .report-entry span, .report-entry small { color: var(--muted); font-weight: 700; }
-.user-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.user-form { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .user-form button { align-self: end; }
 .users-admin-list { display: grid; gap: 10px; }
 .user-row { display: grid; grid-template-columns: minmax(0, 1fr) 180px auto; align-items: end; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
 .user-row-main { display: grid; gap: 3px; }
 .user-row-main span, .user-row-main small { color: var(--muted); font-size: 13px; }
+.user-state { width: fit-content; margin-top: 3px; padding: 3px 8px; border-radius: 6px; font-size: 12px; font-style: normal; font-weight: 800; }
+.user-state.active { background: #e8f7ef; color: #08743f; }
+.user-state.pending { background: #fff2df; color: #9b5d12; }
 .user-row-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.invite-result { display: grid; gap: 10px; padding: 14px; border: 1px solid #b8d9ff; border-radius: 8px; background: #f0f7ff; }
+.invite-result > div:first-child { display: grid; gap: 3px; }
+.invite-result strong { color: var(--ink); }
+.invite-result span { color: var(--muted); font-weight: 700; }
+.setup-link-input { direction: ltr; text-align: left; font-family: Consolas, "Segoe UI", monospace; font-size: 13px; }
+.invite-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.button-link { display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); text-decoration: none; font-size: 13px; font-weight: 800; }
 .admin-switch { background: #fff; border-color: var(--line); }
 
 .floating-status { position: fixed; right: 24px; bottom: 18px; max-width: min(520px, calc(100vw - 48px)); margin: 0; padding: 12px 16px; border-radius: 4px; background: #111; color: #fff; box-shadow: 0 14px 40px rgba(20,32,29,0.18); font-weight: 700; }
@@ -442,5 +452,6 @@ dialog { border-color: var(--monday-line); border-radius: 8px; box-shadow: 0 22p
   input, select, textarea { min-height: 48px; }
   .dialog-actions { position: sticky; bottom: 0; padding-top: 12px; background: #fff; }
   .dialog-actions button { width: 100%; }
-  .user-row-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .user-row-actions { display: grid; grid-template-columns: 1fr; }
+  .invite-actions { display: grid; grid-template-columns: 1fr; }
 }

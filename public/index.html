@@ -31,6 +31,24 @@
       </section>
     </main>
 
+    <main id="setupView" class="login-shell hidden">
+      <section class="login-panel">
+        <div class="product-mark" aria-hidden="true">
+          <span></span><span></span><span></span><span></span>
+        </div>
+        <p class="eyebrow">הגדרת חשבון</p>
+        <h1>בחירת שם וסיסמה</h1>
+        <p id="setupIntro" class="login-copy">הקישור אומת. בחר/י שם משתמש וסיסמה אישית.</p>
+        <form id="setupForm" class="login-form">
+          <label>שם משתמש <input id="setupName" name="name" type="text" autocomplete="name" required /></label>
+          <label>סיסמה <input id="setupPassword" name="password" type="password" autocomplete="new-password" minlength="6" required /></label>
+          <label>אימות סיסמה <input id="setupPasswordConfirm" type="password" autocomplete="new-password" minlength="6" required /></label>
+          <button class="primary" type="submit">שמירת סיסמה וכניסה</button>
+          <p id="setupStatus" class="status" aria-live="polite"></p>
+        </form>
+      </section>
+    </main>
+
     <main id="appView" class="app-shell hidden">
       <aside class="workspace-sidebar" aria-label="ניווט מערכת">
         <div class="workspace-logo">
@@ -121,9 +139,7 @@
           </section>
           <section id="userAdminPanel" class="panel user-admin-panel hidden">
             <form id="userForm" class="user-form">
-              <label>שם מלא <input id="newUserName" name="name" type="text" required /></label>
               <label>אימייל <input id="newUserEmail" name="email" type="email" required /></label>
-              <label>סיסמה <input id="newUserPassword" name="password" type="password" minlength="4" required /></label>
               <label>הרשאה
                 <select id="newUserRole" name="role" required>
                   <option value="therapist">מטפל/ת</option>
@@ -132,8 +148,9 @@
                 </select>
               </label>
               <label>טלפון <input id="newUserPhone" name="phone" type="tel" /></label>
-              <button class="primary" type="submit">הקמת משתמש</button>
+              <button class="primary" type="submit">שליחת הזמנה</button>
             </form>
+            <div id="inviteResult" class="invite-result hidden"></div>
             <div id="usersAdminList" class="users-admin-list"></div>
           </section>
         </section>
