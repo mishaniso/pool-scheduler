@@ -87,6 +87,7 @@ h2 { font-size: 20px; }
 .legend-dot.approved { background: #2a8f57; }
 .legend-dot.holiday { background: #d98b18; }
 .calendar { overflow: auto; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); box-shadow: 0 8px 26px rgba(17, 17, 17, 0.04); }
+.mobile-schedule { display: none; }
 .calendar-grid { min-width: 980px; display: grid; grid-template-columns: 86px repeat(var(--days), minmax(128px, 1fr)); }
 .day-head, .time-head, .time-cell { position: sticky; top: 0; z-index: 2; min-height: 56px; display: grid; place-items: center; padding: 10px; border-bottom: 1px solid var(--line); border-left: 1px solid var(--line); background: #f6f6f6; font-weight: 800; text-align: center; }
 .day-head { gap: 4px; align-content: center; }
@@ -105,6 +106,26 @@ h2 { font-size: 20px; }
 .slot.blocked { cursor: not-allowed; background: #f7f2ec; color: #765315; }
 .slot.blocked > span { border-style: solid; border-color: #f0c47a; color: #765315; background: #fff8ea; }
 .slot:disabled { opacity: 1; }
+
+.mobile-day-tabs { display: flex; gap: 8px; overflow-x: auto; padding: 12px; scroll-snap-type: x mandatory; }
+.mobile-day-tab { flex: 0 0 112px; display: grid; gap: 4px; min-height: 70px; padding: 10px; border-radius: 10px; scroll-snap-align: start; text-align: right; background: #fff; }
+.mobile-day-tab strong { font-size: 15px; }
+.mobile-day-tab small { color: var(--muted); font-size: 12px; font-weight: 800; }
+.mobile-day-tab.active { border-color: var(--blue); background: var(--blue-soft); box-shadow: inset 0 -3px 0 var(--blue); }
+.mobile-day-tab.blocked { background: #fff7e6; color: #765315; }
+.mobile-slot-list { display: grid; gap: 10px; padding: 12px; }
+.mobile-day-title { display: grid; gap: 4px; padding: 4px 2px 8px; }
+.mobile-day-title strong { font-size: 18px; }
+.mobile-day-title span { color: var(--muted); font-weight: 700; }
+.mobile-slot { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; align-items: center; gap: 10px; width: 100%; min-height: 58px; padding: 10px 12px; border-radius: 12px; text-align: right; background: #fff; }
+.mobile-slot-time { color: var(--ink); font-size: 16px; font-weight: 800; }
+.mobile-slot strong { font-size: 15px; }
+.mobile-slot small { color: var(--muted); font-size: 12px; font-weight: 800; }
+.mobile-slot.pending { background: var(--pending-soft); }
+.mobile-slot.approved { background: var(--approved-soft); }
+.mobile-slot .booking-card { width: 100%; grid-column: 1 / -1; }
+.mobile-blocked-day { display: grid; gap: 4px; padding: 16px; border: 1px solid #ffd180; border-radius: 12px; background: #fff8ea; color: #765315; }
+.mobile-blocked-day span { color: #765315; }
 
 .side-panel { display: grid; gap: 16px; }
 .panel { padding: 18px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); box-shadow: 0 8px 26px rgba(17, 17, 17, 0.04); }
@@ -257,6 +278,9 @@ h1 { color: var(--monday-ink); font-size: 30px; }
 .slot.approved { background: #eaf8f0; }
 .slot.blocked { background: #fff7e6; color: #8a5b17; }
 .slot.blocked > span { border-color: #ffd180; background: #fffaf0; color: #8a5b17; }
+.mobile-day-tab.active { border-color: var(--monday-blue); background: #eaf4ff; box-shadow: inset 0 -3px 0 var(--monday-blue); }
+.mobile-slot, .mobile-day-tab { border-color: var(--monday-line); }
+.mobile-slot { box-shadow: 0 3px 10px rgba(41,47,76,0.05); }
 
 .panel { border-color: var(--monday-line); border-radius: 8px; box-shadow: 0 8px 24px rgba(41,47,76,0.08); }
 .panel h2 { padding-bottom: 10px; border-bottom: 1px solid var(--monday-line); }
@@ -292,4 +316,92 @@ dialog { border-color: var(--monday-line); border-radius: 8px; box-shadow: 0 22p
   .content-grid { padding: 16px; }
   .calendar-toolbar { display: grid; }
   h1 { font-size: 24px; }
+}
+
+@media (max-width: 760px) {
+  body { background: #f7f8fb; }
+  button { min-height: 46px; }
+  .login-shell { align-items: start; padding: 16px; }
+  .login-panel { padding: 24px 18px; border-radius: 14px; }
+  .app-shell { display: block; }
+  .workspace-sidebar { display: none; }
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: grid;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--monday-line);
+  }
+  .brand-row { align-items: center; }
+  .board-icon { width: 36px; height: 36px; }
+  .eyebrow { font-size: 12px; }
+  h1 { font-size: 20px; line-height: 1.18; }
+  h2 { font-size: 19px; }
+  .top-actions {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) 48px 76px;
+    gap: 8px;
+  }
+  .top-actions button { min-width: 0; padding: 8px 6px; }
+  .summary-band {
+    position: sticky;
+    top: 104px;
+    z-index: 15;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 10px 14px;
+    background: rgba(247,248,251,0.96);
+    backdrop-filter: blur(10px);
+  }
+  .summary-band .metric-card { display: none; }
+  .summary-band .metric-card.user { display: grid; min-width: 0; padding: 10px 12px; }
+  .summary-band .metric-card.user strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
+  .summary-band #newBookingBtn { min-width: 118px; padding-inline: 12px; }
+  .content-grid {
+    display: grid;
+    gap: 14px;
+    padding: 12px 12px 28px;
+  }
+  .calendar-toolbar {
+    padding: 14px;
+    border: 1px solid var(--monday-line);
+    border-radius: 14px 14px 0 0;
+  }
+  .calendar-toolbar p { font-size: 14px; }
+  .legend { display: none; }
+  .calendar {
+    overflow: hidden;
+    border-radius: 0 0 14px 14px;
+    box-shadow: 0 6px 18px rgba(41,47,76,0.08);
+  }
+  .calendar-grid { display: none; }
+  .mobile-schedule { display: grid; }
+  .side-panel { display: grid; grid-template-columns: 1fr; gap: 14px; }
+  .panel { padding: 14px; border-radius: 14px; }
+  .panel h2 { font-size: 18px; }
+  .booking-card { border-radius: 12px; }
+  .booking-main { display: grid; gap: 4px; }
+  .card-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .card-actions button { width: 100%; }
+  .floating-status {
+    right: 12px;
+    bottom: 12px;
+    max-width: calc(100vw - 24px);
+    border-radius: 12px;
+  }
+  dialog {
+    width: calc(100vw - 20px);
+    max-height: calc(100dvh - 20px);
+    border-radius: 16px;
+  }
+  .dialog-form { padding: 16px; }
+  .dialog-title { position: sticky; top: 0; background: #fff; z-index: 2; }
+  .form-grid { grid-template-columns: 1fr; gap: 12px; }
+  input, select, textarea { min-height: 48px; }
+  .dialog-actions { position: sticky; bottom: 0; padding-top: 12px; background: #fff; }
+  .dialog-actions button { width: 100%; }
+  .user-row-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

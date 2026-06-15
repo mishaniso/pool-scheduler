@@ -3,7 +3,8 @@ const state = {
   users: [],
   settings: { openingHour: 7, closingHour: 22, slotMinutes: 15, treatmentTypes: [], holidays: [] },
   bookings: [],
-  weekStart: startOfWeek(new Date())
+  weekStart: startOfWeek(new Date()),
+  selectedDate: isoDate(new Date())
 };
 
 const els = {
@@ -59,6 +60,10 @@ function formatDate(date) {
 
 function formatFullDate(date) {
   return new Intl.DateTimeFormat("he-IL", { weekday: "long", day: "2-digit", month: "long" }).format(date);
+}
+
+function formatMobileDay(date) {
+  return new Intl.DateTimeFormat("he-IL", { weekday: "short", day: "2-digit", month: "2-digit" }).format(date);
 }
 
 function statusText(status) {
@@ -251,10 +256,13 @@ function actionButton(text, onClick, className = "") {
 
 function renderCalendar() {
   const days = Array.from({ length: 7 }, (_, index) => addDays(state.weekStart, index));
+  const dayKeys = days.map(isoDate);
+  if (!dayKeys.includes(state.selectedDate)) state.selectedDate = dayKeys[0];
   els.weekTitle.textContent = `שבוע ${formatDate(days[0])} - ${formatDate(days[6])}`;
   els.calendarRange.textContent = `ימים ${formatDate(days[0])} עד ${formatDate(days[6])}. הזימון פתוח בימים א׳-ה׳ בין 07:00 ל-22:00, במרווחים של 15 דקות.`;
   const hours = timeSlots();
   els.calendar.innerHTML = "";
+  els.calendar.append(renderMobileSchedule(days, hours));
   const grid = document.createElement("div");
   grid.className = "calendar-grid";
   grid.style.setProperty("--days", String(days.length));
@@ -287,6 +295,61 @@ function renderCalendar() {
   els.calendar.append(grid);
   els.pendingCount.textContent = state.bookings.filter((booking) => booking.status === "pending").length;
   els.approvedCount.textContent = state.bookings.filter((booking) => booking.status === "approved").length;
+}
+
+function renderMobileSchedule(days, hours) {
+  const shell = document.createElement("div");
+  shell.className = "mobile-schedule";
+  const tabs = document.createElement("div");
+  tabs.className = "mobile-day-tabs";
+  days.forEach((day) => {
+    const date = isoDate(day);
+    const blockReason = blockedReasonForDay(day);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "mobile-day-tab";
+    if (date === state.selectedDate) button.classList.add("active");
+    if (blockReason) button.classList.add("blocked");
+    button.innerHTML = `<strong>${formatMobileDay(day)}</strong>${blockReason ? `<small>${escapeHtml(blockReason)}</small>` : "<small>זמין</small>"}`;
+    button.addEventListener("click", () => {
+      state.selectedDate = date;
+      renderCalendar();
+    });
+    tabs.append(button);
+  });
+  const selectedDay = days.find((day) => isoDate(day) === state.selectedDate) || days[0];
+  const selectedDate = isoDate(selectedDay);
+  const blockReason = blockedReasonForDay(selectedDay);
+  const list = document.createElement("div");
+  list.className = "mobile-slot-list";
+  const title = document.createElement("div");
+  title.className = "mobile-day-title";
+  title.innerHTML = `<strong>${formatFullDate(selectedDay)}</strong><span>${blockReason ? `${escapeHtml(blockReason)} חסום לזימון` : "בחר שעה פנויה לפתיחת זימון"}</span>`;
+  list.append(title);
+  if (blockReason) {
+    const blocked = document.createElement("div");
+    blocked.className = "mobile-blocked-day";
+    blocked.innerHTML = `<strong>אין זימונים ביום זה</strong><span>${escapeHtml(blockReason)} מסומן כיום חסום במערכת.</span>`;
+    list.append(blocked);
+  } else {
+    hours.forEach((hour) => {
+      const bookings = bookingsForSlot(selectedDate, hour);
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "mobile-slot";
+      if (bookings.length) {
+        item.classList.add(bookings[0].status);
+        item.disabled = true;
+        item.append(bookingCard(bookings[0], true));
+      } else {
+        item.innerHTML = `<span class="mobile-slot-time">${hour}</span><strong>פנוי</strong><small>לחץ לזימון</small>`;
+        item.addEventListener("click", () => openBookingDialog(selectedDate, hour));
+      }
+      list.append(item);
+    });
+  }
+  shell.append(tabs, list);
+  return shell;
 }
 
 function headerCell(text, className) {
@@ -462,9 +525,22 @@ function handleUsersListClick(event) {
   if (deleteButton) deleteUser(deleteButton.dataset.deleteUser);
 }
 
-document.querySelector("#prevWeekBtn").addEventListener("click", () => { state.weekStart = addDays(state.weekStart, -7); loadData(); });
-document.querySelector("#nextWeekBtn").addEventListener("click", () => { state.weekStart = addDays(state.weekStart, 7); loadData(); });
-document.querySelector("#todayBtn").addEventListener("click", () => { state.weekStart = startOfWeek(new Date()); loadData(); });
+document.querySelector("#prevWeekBtn").addEventListener("click", () => {
+  state.weekStart = addDays(state.weekStart, -7);
+  state.selectedDate = isoDate(state.weekStart);
+  loadData();
+});
+document.querySelector("#nextWeekBtn").addEventListener("click", () => {
+  state.weekStart = addDays(state.weekStart, 7);
+  state.selectedDate = isoDate(state.weekStart);
+  loadData();
+});
+document.querySelector("#todayBtn").addEventListener("click", () => {
+  const today = new Date();
+  state.weekStart = startOfWeek(today);
+  state.selectedDate = isoDate(today);
+  loadData();
+});
 els.newBookingBtn.addEventListener("click", () => openBookingDialog());
 document.querySelector("#logoutBtn").addEventListener("click", () => { localStorage.removeItem("poolUser"); state.user = null; showApp(); });
 document.querySelector("#closeDialogBtn").addEventListener("click", () => els.bookingDialog.close());
