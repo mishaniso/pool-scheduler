@@ -76,6 +76,9 @@ h2 { font-size: 20px; }
 .summary-band strong { font-size: 21px; font-weight: 800; }
 
 .content-grid { display: grid; grid-template-columns: minmax(0, 1fr) 370px; gap: 20px; padding: 24px 28px 40px; align-items: start; }
+.admin-screen { display: grid; gap: 16px; padding: 24px 28px 40px; }
+.admin-screen-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.admin-screen-head p { margin: 4px 0 0; color: var(--muted); font-weight: 700; }
 .schedule-section { min-width: 0; }
 .calendar-toolbar { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
 .calendar-toolbar p { margin: 5px 0 0; color: var(--muted); line-height: 1.45; }
@@ -155,12 +158,14 @@ h2 { font-size: 20px; }
 .empty span { font-size: 13px; line-height: 1.45; }
 
 .user-admin-panel { display: grid; gap: 16px; }
-.user-form { display: grid; gap: 12px; }
+.user-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.user-form button { align-self: end; }
 .users-admin-list { display: grid; gap: 10px; }
-.user-row { display: grid; gap: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
+.user-row { display: grid; grid-template-columns: minmax(0, 1fr) 180px auto; align-items: end; gap: 12px; padding: 12px; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
 .user-row-main { display: grid; gap: 3px; }
 .user-row-main span, .user-row-main small { color: var(--muted); font-size: 13px; }
 .user-row-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.admin-switch { background: #fff; border-color: var(--line); }
 
 .floating-status { position: fixed; right: 24px; bottom: 18px; max-width: min(520px, calc(100vw - 48px)); margin: 0; padding: 12px 16px; border-radius: 4px; background: #111; color: #fff; box-shadow: 0 14px 40px rgba(20,32,29,0.18); font-weight: 700; }
 .floating-status:empty { display: none; }
@@ -257,6 +262,8 @@ h1 { color: var(--monday-ink); font-size: 30px; }
 .summary-band span, .calendar-toolbar p, .booking-card span, .empty span { color: var(--monday-muted); }
 
 .content-grid { padding: 22px 24px 34px; grid-template-columns: minmax(0, 1fr) 360px; }
+.admin-screen { padding: 22px 24px 34px; }
+.admin-screen-head { border-color: var(--monday-line); border-radius: 8px; box-shadow: 0 8px 24px rgba(41,47,76,0.08); }
 .calendar-toolbar { padding: 16px; margin-bottom: 0; border: 1px solid var(--monday-line); border-bottom: 0; border-radius: 8px 8px 0 0; background: #fff; }
 .calendar-toolbar h2 { font-size: 22px; }
 .legend span { border-color: var(--monday-line); border-radius: 6px; background: #fff; }
@@ -300,6 +307,7 @@ h1 { color: var(--monday-ink); font-size: 30px; }
 .empty { border-color: var(--monday-line); border-radius: 8px; background: #f8f9fd; }
 .user-row { border-color: var(--monday-line); border-radius: 8px; box-shadow: 0 3px 10px rgba(41,47,76,0.05); }
 .user-row-main span, .user-row-main small { color: var(--monday-muted); }
+.admin-switch { border-color: var(--monday-line); }
 
 dialog { border-color: var(--monday-line); border-radius: 8px; box-shadow: 0 22px 70px rgba(41,47,76,0.2); }
 .dialog-title { border-bottom: 1px solid var(--monday-line); padding-bottom: 14px; }
@@ -309,6 +317,18 @@ dialog { border-color: var(--monday-line); border-radius: 8px; box-shadow: 0 22p
 @media (max-width: 1050px) {
   .app-shell { grid-template-columns: 1fr; }
   .workspace-sidebar { display: none; }
+}
+
+@media (max-width: 900px) {
+  .content-grid { grid-template-columns: 1fr; padding: 16px; }
+  .calendar-grid { display: none; }
+  .mobile-schedule { display: grid; }
+  .calendar { overflow: hidden; }
+  .side-panel { grid-template-columns: 1fr; }
+  .admin-screen { padding: 16px; }
+  .admin-screen-head { display: grid; }
+  .user-form { grid-template-columns: 1fr; }
+  .user-row { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 760px) {
@@ -350,7 +370,7 @@ dialog { border-color: var(--monday-line); border-radius: 8px; box-shadow: 0 22p
     top: 104px;
     z-index: 15;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     gap: 10px;
     padding: 10px 14px;
     background: rgba(247,248,251,0.96);
@@ -360,6 +380,7 @@ dialog { border-color: var(--monday-line); border-radius: 8px; box-shadow: 0 22p
   .summary-band .metric-card.user { display: grid; min-width: 0; padding: 10px 12px; }
   .summary-band .metric-card.user strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; }
   .summary-band #newBookingBtn { min-width: 118px; padding-inline: 12px; }
+  .summary-band .admin-switch { min-width: 92px; padding-inline: 10px; }
   .content-grid {
     display: grid;
     gap: 14px;

@@ -34,6 +34,10 @@ const els = {
   userForm: document.querySelector("#userForm"),
   usersAdminList: document.querySelector("#usersAdminList"),
   usersNavLink: document.querySelector("#usersNavLink"),
+  usersMobileBtn: document.querySelector("#usersMobileBtn"),
+  backToScheduleBtn: document.querySelector("#backToScheduleBtn"),
+  scheduleScreen: document.querySelector("#scheduleScreen"),
+  userAdminScreen: document.querySelector("#userAdminScreen"),
   newBookingBtn: document.querySelector("#newBookingBtn")
 };
 
@@ -139,6 +143,7 @@ function showApp() {
     els.userName.textContent = `${state.user.name} (${roleText(state.user.role)})`;
     els.newBookingBtn.disabled = state.user.role === "viewer";
     els.newBookingBtn.title = state.user.role === "viewer" ? "משתמש צפייה בלבד לא יכול ליצור זימון" : "";
+    showScreen("schedule");
     loadData();
   }
 }
@@ -180,6 +185,16 @@ function renderAll() {
   renderCalendar();
   renderLists();
   renderUserAdmin();
+}
+
+function showScreen(screen) {
+  const isUsers = screen === "users" && state.user?.role === "admin";
+  els.scheduleScreen.classList.toggle("hidden", isUsers);
+  els.userAdminScreen.classList.toggle("hidden", !isUsers);
+  els.newBookingBtn.classList.toggle("hidden", isUsers);
+  els.usersMobileBtn.classList.toggle("hidden", isUsers || state.user?.role !== "admin");
+  els.usersNavLink.classList.toggle("active", isUsers);
+  document.querySelector('.workspace-nav a[href="#calendar"]')?.classList.toggle("active", !isUsers);
 }
 
 function renderTimeOptions() {
@@ -392,7 +407,9 @@ function renderBookingList(target, bookings, emptyText) {
 function renderUserAdmin() {
   const isAdmin = state.user?.role === "admin";
   els.userAdminPanel.classList.toggle("hidden", !isAdmin);
+  els.userAdminScreen.classList.toggle("admin-locked", !isAdmin);
   els.usersNavLink.classList.toggle("hidden", !isAdmin);
+  els.usersMobileBtn.classList.toggle("hidden", !isAdmin || !els.userAdminScreen.classList.contains("hidden"));
   if (!isAdmin) return;
   els.usersAdminList.innerHTML = "";
   state.users.forEach((user) => {
@@ -542,6 +559,12 @@ document.querySelector("#todayBtn").addEventListener("click", () => {
   loadData();
 });
 els.newBookingBtn.addEventListener("click", () => openBookingDialog());
+els.usersNavLink.addEventListener("click", (event) => {
+  event.preventDefault();
+  showScreen("users");
+});
+els.usersMobileBtn.addEventListener("click", () => showScreen("users"));
+els.backToScheduleBtn.addEventListener("click", () => showScreen("schedule"));
 document.querySelector("#logoutBtn").addEventListener("click", () => { localStorage.removeItem("poolUser"); state.user = null; showApp(); });
 document.querySelector("#closeDialogBtn").addEventListener("click", () => els.bookingDialog.close());
 els.loginForm.addEventListener("submit", login);

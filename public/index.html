@@ -72,10 +72,11 @@
           <div class="metric-card user"><span>מחובר/ת</span><strong id="userName"></strong></div>
           <div class="metric-card pending"><span>ממתינים לאישור</span><strong id="pendingCount">0</strong></div>
           <div class="metric-card approved"><span>מאושרים השבוע</span><strong id="approvedCount">0</strong></div>
+          <button id="usersMobileBtn" class="admin-switch hidden" type="button">משתמשים</button>
           <button id="newBookingBtn" class="primary" type="button">זימון חדש</button>
         </section>
 
-        <section class="content-grid">
+        <section id="scheduleScreen" class="content-grid">
           <section class="schedule-section">
             <div class="calendar-toolbar">
               <div>
@@ -94,25 +95,33 @@
           <aside class="side-panel">
             <section class="panel"><h2>בקשות ממתינות</h2><div id="pendingList" class="booking-list"></div></section>
             <section class="panel"><h2>הזימונים שלי</h2><div id="myBookings" class="booking-list"></div></section>
-            <section id="userAdminPanel" class="panel user-admin-panel hidden">
-              <h2>ניהול משתמשים</h2>
-              <form id="userForm" class="user-form">
-                <label>שם מלא <input id="newUserName" name="name" type="text" required /></label>
-                <label>אימייל <input id="newUserEmail" name="email" type="email" required /></label>
-                <label>סיסמה <input id="newUserPassword" name="password" type="password" minlength="4" required /></label>
-                <label>הרשאה
-                  <select id="newUserRole" name="role" required>
-                    <option value="therapist">מטפל/ת</option>
-                    <option value="viewer">צפייה בלבד</option>
-                    <option value="admin">מנהל/ת</option>
-                  </select>
-                </label>
-                <label>טלפון <input id="newUserPhone" name="phone" type="tel" /></label>
-                <button class="primary" type="submit">הקמת משתמש</button>
-              </form>
-              <div id="usersAdminList" class="users-admin-list"></div>
-            </section>
           </aside>
+        </section>
+        <section id="userAdminScreen" class="admin-screen hidden">
+          <div class="admin-screen-head">
+            <div>
+              <h2>ניהול משתמשים</h2>
+              <p>הקמה, מחיקה ושינוי הרשאות למשתמשים במערכת.</p>
+            </div>
+            <button id="backToScheduleBtn" type="button">חזרה ללוח</button>
+          </div>
+          <section id="userAdminPanel" class="panel user-admin-panel hidden">
+            <form id="userForm" class="user-form">
+              <label>שם מלא <input id="newUserName" name="name" type="text" required /></label>
+              <label>אימייל <input id="newUserEmail" name="email" type="email" required /></label>
+              <label>סיסמה <input id="newUserPassword" name="password" type="password" minlength="4" required /></label>
+              <label>הרשאה
+                <select id="newUserRole" name="role" required>
+                  <option value="therapist">מטפל/ת</option>
+                  <option value="viewer">צפייה בלבד</option>
+                  <option value="admin">מנהל/ת</option>
+                </select>
+              </label>
+              <label>טלפון <input id="newUserPhone" name="phone" type="tel" /></label>
+              <button class="primary" type="submit">הקמת משתמש</button>
+            </form>
+            <div id="usersAdminList" class="users-admin-list"></div>
+          </section>
         </section>
         <p id="appStatus" class="floating-status" aria-live="polite"></p>
       </section>
