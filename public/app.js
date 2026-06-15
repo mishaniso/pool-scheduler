@@ -301,6 +301,10 @@ function bookingsForSlot(date, start) {
   });
 }
 
+function bookingStartingAt(date, start) {
+  return state.bookings.find((booking) => booking.date === date && booking.start === start && ["pending", "approved"].includes(booking.status));
+}
+
 function bookingConflictsForRange(date, start, end) {
   const rangeStart = timeToMinutes(start);
   const rangeEnd = timeToMinutes(end);
@@ -316,6 +320,10 @@ function isBookingStartAt(booking, hour) {
 
 function isBookingEndAt(booking, hour) {
   return bookingEndMinutes(booking) === timeToMinutes(hour) + Number(state.settings.slotMinutes || 15);
+}
+
+function bookingSlotSpan(booking) {
+  return Math.max(1, Math.ceil((bookingEndMinutes(booking) - timeToMinutes(booking.start)) / Number(state.settings.slotMinutes || 15)));
 }
 
 function bookingCard(booking, compact = false) {
@@ -376,33 +384,35 @@ function renderCalendar() {
   const grid = document.createElement("div");
   grid.className = "calendar-grid";
   grid.style.setProperty("--days", String(days.length));
-  grid.append(headerCell("שעה", "time-head"));
-  days.forEach((day) => grid.append(dayHeader(day)));
-  hours.forEach((hour) => {
-    grid.append(headerCell(hour, "time-cell"));
-    days.forEach((day) => {
+  grid.append(positionedCell(headerCell("שעה", "time-head"), 1, 1));
+  days.forEach((day, dayIndex) => grid.append(positionedCell(dayHeader(day), 1, dayIndex + 2)));
+  hours.forEach((hour, hourIndex) => {
+    const row = hourIndex + 2;
+    grid.append(positionedCell(headerCell(hour, "time-cell"), row, 1));
+    days.forEach((day, dayIndex) => {
       const date = isoDate(day);
       const blockReason = blockedReasonForDay(day);
+      const currentBooking = bookingsForSlot(date, hour)[0];
+      if (currentBooking && !isBookingStartAt(currentBooking, hour)) return;
       const cell = document.createElement("button");
       cell.type = "button";
       cell.className = "slot";
+      cell.style.gridColumn = String(dayIndex + 2);
+      cell.style.gridRow = currentBooking ? `${row} / span ${bookingSlotSpan(currentBooking)}` : String(row);
       cell.setAttribute("aria-label", `${formatFullDate(day)}, שעה ${hour}`);
-      const bookings = bookingsForSlot(date, hour);
-      if (bookings.length) {
-        const booking = bookings[0];
+      if (currentBooking) {
+        const booking = currentBooking;
         cell.classList.add(booking.status, "range-block");
-        if (isBookingStartAt(booking, hour)) cell.classList.add("range-start");
-        if (isBookingEndAt(booking, hour)) cell.classList.add("range-end");
-        if (!isBookingStartAt(booking, hour)) cell.classList.add("continues-booking");
-        if (isBookingStartAt(booking, hour)) cell.append(bookingCard(booking, true));
+        cell.append(bookingCard(booking, true));
       } else if (blockReason) {
         cell.classList.add("blocked");
-        cell.disabled = true;
+        cell.setAttribute("aria-disabled", "true");
         cell.innerHTML = `<span>חסום</span><small>${escapeHtml(blockReason)}</small>`;
       } else {
         cell.innerHTML = "<span>פנוי</span><small>לחץ לזימון</small>";
       }
-      if (!blockReason) cell.addEventListener("click", () => openBookingDialog(date, hour));
+      if (blockReason && !currentBooking) cell.addEventListener("click", () => setStatus(`${blockReason} חסום לזימון.`, true));
+      if (!blockReason && !currentBooking) cell.addEventListener("click", () => openBookingDialog(date, hour));
       grid.append(cell);
     });
   });
@@ -448,6 +458,7 @@ function renderMobileSchedule(days, hours) {
   } else {
     hours.forEach((hour) => {
       const bookings = bookingsForSlot(selectedDate, hour);
+      if (bookings.length && !isBookingStartAt(bookings[0], hour)) return;
       const item = document.createElement("button");
       item.type = "button";
       item.className = "mobile-slot";
@@ -475,6 +486,12 @@ function headerCell(text, className) {
   const cell = document.createElement("div");
   cell.className = className;
   cell.textContent = text;
+  return cell;
+}
+
+function positionedCell(cell, row, column) {
+  cell.style.gridRow = String(row);
+  cell.style.gridColumn = String(column);
   return cell;
 }
 
@@ -621,6 +638,10 @@ async function submitBooking(event) {
   event.preventDefault();
   const payload = Object.fromEntries(new FormData(els.bookingForm).entries());
   payload.approveNow = els.approveNow.checked;
+  if (isPastDateKey(payload.date)) {
+    setStatus("לא ניתן לתאם זימון לתאריך שכבר עבר. הטיפולים הישנים נשמרים לדוחות בלבד.", true);
+    return;
+  }
   const conflicts = bookingConflictsForRange(payload.date, payload.start, payload.end);
   if (conflicts.length) {
     setStatus(`הטווח שבחרת חופף לזימון קיים (${conflicts[0].start}-${conflicts[0].end}).`, true);
