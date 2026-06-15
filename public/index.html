@@ -9,6 +9,9 @@
   <body>
     <main id="loginView" class="login-shell">
       <section class="login-panel">
+        <div class="product-mark" aria-hidden="true">
+          <span></span><span></span><span></span><span></span>
+        </div>
         <p class="eyebrow">מערכת זימונים</p>
         <h1>בריכה טיפולית</h1>
         <p class="login-copy">ניהול שבועי של זמינות הבריכה, בקשות מטפלים ואישורי מנהל.</p>
@@ -27,9 +30,14 @@
 
     <main id="appView" class="app-shell hidden">
       <header class="topbar">
-        <div>
+        <div class="brand-row">
+          <div class="product-mark compact" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div>
           <p class="eyebrow">לו"ז בריכה טיפולית</p>
           <h1 id="weekTitle">ניהול זמינות וזימונים</h1>
+          </div>
         </div>
         <div class="top-actions">
           <button id="prevWeekBtn" type="button" aria-label="שבוע קודם">‹</button>
@@ -40,9 +48,9 @@
       </header>
 
       <section class="summary-band">
-        <div><span>מחובר/ת</span><strong id="userName"></strong></div>
-        <div><span>ממתינים לאישור</span><strong id="pendingCount">0</strong></div>
-        <div><span>מאושרים השבוע</span><strong id="approvedCount">0</strong></div>
+        <div class="metric-card user"><span>מחובר/ת</span><strong id="userName"></strong></div>
+        <div class="metric-card pending"><span>ממתינים לאישור</span><strong id="pendingCount">0</strong></div>
+        <div class="metric-card approved"><span>מאושרים השבוע</span><strong id="approvedCount">0</strong></div>
         <button id="newBookingBtn" class="primary" type="button">זימון חדש</button>
       </section>
 
