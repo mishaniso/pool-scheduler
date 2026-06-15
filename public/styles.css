@@ -106,6 +106,7 @@ h2 { font-size: 20px; }
 .slot > small { justify-self: center; color: var(--muted); font-size: 12px; }
 .slot.pending { background: var(--pending-soft); }
 .slot.approved { background: var(--approved-soft); }
+.slot.continues-booking { box-shadow: inset 0 3px 0 rgba(0, 115, 234, 0.22); }
 .slot.blocked { cursor: not-allowed; background: #f7f2ec; color: #765315; }
 .slot.blocked > span { border-style: solid; border-color: #f0c47a; color: #765315; background: #fff8ea; }
 .slot:disabled { opacity: 1; }
@@ -126,6 +127,7 @@ h2 { font-size: 20px; }
 .mobile-slot small { color: var(--muted); font-size: 12px; font-weight: 800; }
 .mobile-slot.pending { background: var(--pending-soft); }
 .mobile-slot.approved { background: var(--approved-soft); }
+.mobile-slot.continues-booking { opacity: 0.88; }
 .mobile-slot .booking-card { width: 100%; grid-column: 1 / -1; }
 .mobile-blocked-day { display: grid; gap: 4px; padding: 16px; border: 1px solid #ffd180; border-radius: 12px; background: #fff8ea; color: #765315; }
 .mobile-blocked-day span { color: #765315; }

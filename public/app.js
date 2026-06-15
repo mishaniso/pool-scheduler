@@ -117,6 +117,19 @@ function timeSlots() {
   return slots;
 }
 
+function timeToMinutes(time) {
+  const [hours, mins] = String(time || "00:00").split(":").map(Number);
+  return hours * 60 + mins;
+}
+
+function bookingEndMinutes(booking) {
+  return booking.end ? timeToMinutes(booking.end) : timeToMinutes(booking.start) + Number(state.settings.slotMinutes || 15);
+}
+
+function rangesOverlap(startA, endA, startB, endB) {
+  return startA < endB && startB < endA;
+}
+
 function roleText(role) {
   return { admin: "מנהל/ת", therapist: "מטפל/ת", viewer: "צפייה בלבד" }[role] || role;
 }
@@ -223,7 +236,12 @@ function renderTherapists() {
 }
 
 function bookingsForSlot(date, start) {
-  return state.bookings.filter((booking) => booking.date === date && booking.start === start && ["pending", "approved"].includes(booking.status));
+  const slotStart = timeToMinutes(start);
+  const slotEnd = slotStart + Number(state.settings.slotMinutes || 15);
+  return state.bookings.filter((booking) => {
+    if (booking.date !== date || !["pending", "approved"].includes(booking.status)) return false;
+    return rangesOverlap(slotStart, slotEnd, timeToMinutes(booking.start), bookingEndMinutes(booking));
+  });
 }
 
 function bookingCard(booking, compact = false) {
@@ -298,6 +316,7 @@ function renderCalendar() {
       const bookings = bookingsForSlot(date, hour);
       if (bookings.length) {
         cell.classList.add(bookings[0].status);
+        if (bookings[0].start !== hour) cell.classList.add("continues-booking");
         cell.append(bookingCard(bookings[0], true));
       } else if (blockReason) {
         cell.classList.add("blocked");
@@ -357,6 +376,7 @@ function renderMobileSchedule(days, hours) {
       item.className = "mobile-slot";
       if (bookings.length) {
         item.classList.add(bookings[0].status);
+        if (bookings[0].start !== hour) item.classList.add("continues-booking");
         item.disabled = true;
         item.append(bookingCard(bookings[0], true));
       } else {

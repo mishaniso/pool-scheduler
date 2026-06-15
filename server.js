@@ -250,6 +250,19 @@ function addMinutes(time, minutes) {
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
+function timeToMinutes(time) {
+  const [hours, mins] = String(time || "00:00").split(":").map(Number);
+  return hours * 60 + mins;
+}
+
+function bookingEndMinutes(booking, fallbackMinutes) {
+  return booking.end ? timeToMinutes(booking.end) : timeToMinutes(booking.start) + fallbackMinutes;
+}
+
+function rangesOverlap(startA, endA, startB, endB) {
+  return startA < endB && startB < endA;
+}
+
 function isActive(status) {
   return status === "pending" || status === "approved";
 }
@@ -262,7 +275,7 @@ function blockedReason(db, date) {
   return holiday ? `${holiday.name} חסום לזימון.` : "";
 }
 
-function validateSlot(db, date, start, ignoreId = "") {
+function validateSlot(db, date, start, ignoreId = "", requestedEnd = "") {
   const hour = Number(start.slice(0, 2));
   const minute = Number(start.slice(3, 5));
   const reason = blockedReason(db, date);
@@ -272,16 +285,22 @@ function validateSlot(db, date, start, ignoreId = "") {
     throw error;
   }
   const startTotal = hour * 60 + minute;
+  const endTotal = requestedEnd ? timeToMinutes(requestedEnd) : startTotal + db.settings.slotMinutes;
   const openTotal = db.settings.openingHour * 60;
   const closeTotal = db.settings.closingHour * 60;
-  if (minute % db.settings.slotMinutes !== 0 || startTotal < openTotal || startTotal + db.settings.slotMinutes > closeTotal) {
+  if (minute % db.settings.slotMinutes !== 0 || startTotal < openTotal || endTotal > closeTotal || endTotal <= startTotal) {
     const error = new Error("ניתן להזמין רק בין 07:00 ל-22:00 ובמרווחים של 15 דקות.");
     error.status = 400;
     throw error;
   }
-  const conflict = db.bookings.find((booking) => booking.id !== ignoreId && booking.date === date && booking.start === start && isActive(booking.status));
+  const conflict = db.bookings.find((booking) => {
+    if (booking.id === ignoreId || booking.date !== date || !isActive(booking.status)) return false;
+    const bookingStart = timeToMinutes(booking.start);
+    const bookingEnd = bookingEndMinutes(booking, db.settings.slotMinutes);
+    return rangesOverlap(startTotal, endTotal, bookingStart, bookingEnd);
+  });
   if (conflict) {
-    const error = new Error("השעה הזו כבר תפוסה. לא ניתן להזמין שני מטפלים באותה שעה.");
+    const error = new Error(`השעה הזו חופפת לזימון קיים (${conflict.start}-${conflict.end}). לא ניתן להזמין שני מטפלים באותו טווח זמן.`);
     error.status = 409;
     throw error;
   }
@@ -482,7 +501,7 @@ async function approveBooking(req, id) {
     error.status = 400;
     throw error;
   }
-  validateSlot(db, booking.date, booking.start, booking.id);
+  validateSlot(db, booking.date, booking.start, booking.id, booking.end);
   booking.status = "approved";
   booking.approvedAt = new Date().toISOString();
   booking.approvedBy = admin.id;
