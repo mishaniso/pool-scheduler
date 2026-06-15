@@ -4,6 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ניהול לו"ז בריכה טיפולית</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -38,6 +41,7 @@
           <a class="active" href="#calendar">לוח זימונים</a>
           <a href="#pendingList">אישורי מנהל</a>
           <a href="#myBookings">הזימונים שלי</a>
+          <a id="usersNavLink" href="#userAdminPanel">ניהול משתמשים</a>
         </nav>
         <div class="sidebar-note">
           <span>Workspace</span>
@@ -90,6 +94,24 @@
           <aside class="side-panel">
             <section class="panel"><h2>בקשות ממתינות</h2><div id="pendingList" class="booking-list"></div></section>
             <section class="panel"><h2>הזימונים שלי</h2><div id="myBookings" class="booking-list"></div></section>
+            <section id="userAdminPanel" class="panel user-admin-panel hidden">
+              <h2>ניהול משתמשים</h2>
+              <form id="userForm" class="user-form">
+                <label>שם מלא <input id="newUserName" name="name" type="text" required /></label>
+                <label>אימייל <input id="newUserEmail" name="email" type="email" required /></label>
+                <label>סיסמה <input id="newUserPassword" name="password" type="password" minlength="4" required /></label>
+                <label>הרשאה
+                  <select id="newUserRole" name="role" required>
+                    <option value="therapist">מטפל/ת</option>
+                    <option value="viewer">צפייה בלבד</option>
+                    <option value="admin">מנהל/ת</option>
+                  </select>
+                </label>
+                <label>טלפון <input id="newUserPhone" name="phone" type="tel" /></label>
+                <button class="primary" type="submit">הקמת משתמש</button>
+              </form>
+              <div id="usersAdminList" class="users-admin-list"></div>
+            </section>
           </aside>
         </section>
         <p id="appStatus" class="floating-status" aria-live="polite"></p>

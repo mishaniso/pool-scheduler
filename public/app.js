@@ -1,7 +1,7 @@
 const state = {
   user: JSON.parse(localStorage.getItem("poolUser") || "null"),
   users: [],
-  settings: { openingHour: 8, closingHour: 20, slotMinutes: 60, treatmentTypes: [], holidays: [] },
+  settings: { openingHour: 7, closingHour: 22, slotMinutes: 15, treatmentTypes: [], holidays: [] },
   bookings: [],
   weekStart: startOfWeek(new Date())
 };
@@ -28,7 +28,12 @@ const els = {
   bookingTherapist: document.querySelector("#bookingTherapist"),
   therapistField: document.querySelector("#therapistField"),
   approveNowField: document.querySelector("#approveNowField"),
-  approveNow: document.querySelector("#approveNow")
+  approveNow: document.querySelector("#approveNow"),
+  userAdminPanel: document.querySelector("#userAdminPanel"),
+  userForm: document.querySelector("#userForm"),
+  usersAdminList: document.querySelector("#usersAdminList"),
+  usersNavLink: document.querySelector("#usersNavLink"),
+  newBookingBtn: document.querySelector("#newBookingBtn")
 };
 
 function startOfWeek(date) {
@@ -82,6 +87,28 @@ function holidayFor(date) {
   return (state.settings.holidays || []).find((holiday) => holiday.date === key);
 }
 
+function blockedReasonForDay(date) {
+  const holiday = holidayFor(date);
+  if (date.getDay() === 5) return "יום שישי";
+  if (date.getDay() === 6) return "שבת";
+  return holiday?.name || "";
+}
+
+function timeSlots() {
+  const slots = [];
+  const step = Number(state.settings.slotMinutes || 15);
+  const start = Number(state.settings.openingHour || 7) * 60;
+  const end = Number(state.settings.closingHour || 22) * 60;
+  for (let minutes = start; minutes + step <= end; minutes += step) {
+    slots.push(`${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`);
+  }
+  return slots;
+}
+
+function roleText(role) {
+  return { admin: "מנהל/ת", therapist: "מטפל/ת", viewer: "צפייה בלבד" }[role] || role;
+}
+
 function setStatus(message, isError = false) {
   els.appStatus.textContent = message;
   els.appStatus.classList.toggle("error", isError);
@@ -104,7 +131,9 @@ function showApp() {
   els.loginView.classList.toggle("hidden", loggedIn);
   els.appView.classList.toggle("hidden", !loggedIn);
   if (loggedIn) {
-    els.userName.textContent = `${state.user.name} (${state.user.role === "admin" ? "מנהל/ת" : "מטפל/ת"})`;
+    els.userName.textContent = `${state.user.name} (${roleText(state.user.role)})`;
+    els.newBookingBtn.disabled = state.user.role === "viewer";
+    els.newBookingBtn.title = state.user.role === "viewer" ? "משתמש צפייה בלבד לא יכול ליצור זימון" : "";
     loadData();
   }
 }
@@ -145,16 +174,17 @@ function renderAll() {
   renderTherapists();
   renderCalendar();
   renderLists();
+  renderUserAdmin();
 }
 
 function renderTimeOptions() {
   els.bookingStart.innerHTML = "";
-  for (let hour = state.settings.openingHour; hour < state.settings.closingHour; hour += 1) {
+  timeSlots().forEach((slot) => {
     const option = document.createElement("option");
-    option.value = `${String(hour).padStart(2, "0")}:00`;
-    option.textContent = option.value;
+    option.value = slot;
+    option.textContent = slot;
     els.bookingStart.append(option);
-  }
+  });
 }
 
 function renderTreatmentTypes() {
@@ -222,9 +252,8 @@ function actionButton(text, onClick, className = "") {
 function renderCalendar() {
   const days = Array.from({ length: 7 }, (_, index) => addDays(state.weekStart, index));
   els.weekTitle.textContent = `שבוע ${formatDate(days[0])} - ${formatDate(days[6])}`;
-  els.calendarRange.textContent = `ימים ${formatDate(days[0])} עד ${formatDate(days[6])}. בחירה בשעה פנויה פותחת בקשת זימון.`;
-  const hours = [];
-  for (let hour = state.settings.openingHour; hour < state.settings.closingHour; hour += 1) hours.push(`${String(hour).padStart(2, "0")}:00`);
+  els.calendarRange.textContent = `ימים ${formatDate(days[0])} עד ${formatDate(days[6])}. הזימון פתוח בימים א׳-ה׳ בין 07:00 ל-22:00, במרווחים של 15 דקות.`;
+  const hours = timeSlots();
   els.calendar.innerHTML = "";
   const grid = document.createElement("div");
   grid.className = "calendar-grid";
@@ -235,6 +264,7 @@ function renderCalendar() {
     grid.append(headerCell(hour, "time-cell"));
     days.forEach((day) => {
       const date = isoDate(day);
+      const blockReason = blockedReasonForDay(day);
       const cell = document.createElement("button");
       cell.type = "button";
       cell.className = "slot";
@@ -243,10 +273,14 @@ function renderCalendar() {
       if (bookings.length) {
         cell.classList.add(bookings[0].status);
         cell.append(bookingCard(bookings[0], true));
+      } else if (blockReason) {
+        cell.classList.add("blocked");
+        cell.disabled = true;
+        cell.innerHTML = `<span>חסום</span><small>${escapeHtml(blockReason)}</small>`;
       } else {
         cell.innerHTML = "<span>פנוי</span><small>לחץ לזימון</small>";
       }
-      cell.addEventListener("click", () => openBookingDialog(date, hour));
+      if (!blockReason) cell.addEventListener("click", () => openBookingDialog(date, hour));
       grid.append(cell);
     });
   });
@@ -264,12 +298,13 @@ function headerCell(text, className) {
 
 function dayHeader(day) {
   const holiday = holidayFor(day);
+  const isFriday = day.getDay() === 5;
   const isSaturday = day.getDay() === 6;
   const cell = document.createElement("div");
   cell.className = "day-head";
-  if (isSaturday) cell.classList.add("saturday");
+  if (isFriday || isSaturday) cell.classList.add("weekend");
   if (holiday) cell.classList.add("holiday");
-  cell.innerHTML = `<span>${formatFullDate(day)}</span>${isSaturday ? "<small>שבת</small>" : ""}${holiday ? `<small>${holiday.name}</small>` : ""}`;
+  cell.innerHTML = `<span>${formatFullDate(day)}</span>${isFriday ? "<small>שישי</small>" : ""}${isSaturday ? "<small>שבת</small>" : ""}${holiday ? `<small>${holiday.name}</small>` : ""}`;
   return cell;
 }
 
@@ -291,7 +326,48 @@ function renderBookingList(target, bookings, emptyText) {
   bookings.forEach((booking) => target.append(bookingCard(booking)));
 }
 
+function renderUserAdmin() {
+  const isAdmin = state.user?.role === "admin";
+  els.userAdminPanel.classList.toggle("hidden", !isAdmin);
+  els.usersNavLink.classList.toggle("hidden", !isAdmin);
+  if (!isAdmin) return;
+  els.usersAdminList.innerHTML = "";
+  state.users.forEach((user) => {
+    const row = document.createElement("article");
+    row.className = "user-row";
+    row.innerHTML = `
+      <div class="user-row-main">
+        <strong>${escapeHtml(user.name)}</strong>
+        <span>${escapeHtml(user.email)}</span>
+        ${user.phone ? `<small>${escapeHtml(user.phone)}</small>` : ""}
+      </div>
+      <label>הרשאה
+        <select data-role-for="${user.id}">
+          <option value="therapist" ${user.role === "therapist" ? "selected" : ""}>מטפל/ת</option>
+          <option value="viewer" ${user.role === "viewer" ? "selected" : ""}>צפייה בלבד</option>
+          <option value="admin" ${user.role === "admin" ? "selected" : ""}>מנהל/ת</option>
+        </select>
+      </label>
+      <div class="user-row-actions">
+        <button type="button" class="small" data-save-user="${user.id}">שמירה</button>
+        <button type="button" class="danger small" data-delete-user="${user.id}">מחיקה</button>
+      </div>
+    `;
+    els.usersAdminList.append(row);
+  });
+}
+
 function openBookingDialog(date = isoDate(new Date()), start = "08:00") {
+  if (state.user.role === "viewer") {
+    setStatus("משתמש צפייה בלבד לא יכול ליצור זימון.", true);
+    return;
+  }
+  const day = new Date(`${date}T12:00:00`);
+  const blockReason = blockedReasonForDay(day);
+  if (blockReason) {
+    setStatus(`${blockReason} חסום לזימון.`, true);
+    return;
+  }
   if (bookingsForSlot(date, start).length) {
     setStatus("השעה הזו כבר תפוסה או ממתינה לאישור.", true);
     return;
@@ -338,12 +414,62 @@ async function cancelBooking(id) {
   setStatus("הזימון בוטל.");
 }
 
+async function submitUser(event) {
+  event.preventDefault();
+  const payload = Object.fromEntries(new FormData(els.userForm).entries());
+  try {
+    await api("/api/users", { method: "POST", body: JSON.stringify(payload) });
+    els.userForm.reset();
+    await loadData();
+    setStatus("המשתמש הוקם בהצלחה.");
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+}
+
+async function saveUserRole(id) {
+  const user = state.users.find((candidate) => candidate.id === id);
+  const role = document.querySelector(`[data-role-for="${CSS.escape(id)}"]`)?.value;
+  if (!user || !role) return;
+  try {
+    await api(`/api/users/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ name: user.name, email: user.email, phone: user.phone, role })
+    });
+    await loadData();
+    setStatus("רמת ההרשאה עודכנה.");
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+}
+
+async function deleteUser(id) {
+  const user = state.users.find((candidate) => candidate.id === id);
+  if (!user || !confirm(`למחוק את ${user.name}?`)) return;
+  try {
+    await api(`/api/users/${id}`, { method: "DELETE" });
+    await loadData();
+    setStatus("המשתמש נמחק.");
+  } catch (error) {
+    setStatus(error.message, true);
+  }
+}
+
+function handleUsersListClick(event) {
+  const saveButton = event.target.closest("[data-save-user]");
+  const deleteButton = event.target.closest("[data-delete-user]");
+  if (saveButton) saveUserRole(saveButton.dataset.saveUser);
+  if (deleteButton) deleteUser(deleteButton.dataset.deleteUser);
+}
+
 document.querySelector("#prevWeekBtn").addEventListener("click", () => { state.weekStart = addDays(state.weekStart, -7); loadData(); });
 document.querySelector("#nextWeekBtn").addEventListener("click", () => { state.weekStart = addDays(state.weekStart, 7); loadData(); });
 document.querySelector("#todayBtn").addEventListener("click", () => { state.weekStart = startOfWeek(new Date()); loadData(); });
-document.querySelector("#newBookingBtn").addEventListener("click", () => openBookingDialog());
+els.newBookingBtn.addEventListener("click", () => openBookingDialog());
 document.querySelector("#logoutBtn").addEventListener("click", () => { localStorage.removeItem("poolUser"); state.user = null; showApp(); });
 document.querySelector("#closeDialogBtn").addEventListener("click", () => els.bookingDialog.close());
 els.loginForm.addEventListener("submit", login);
 els.bookingForm.addEventListener("submit", submitBooking);
+els.userForm.addEventListener("submit", submitUser);
+els.usersAdminList.addEventListener("click", handleUsersListClick);
 showApp();
