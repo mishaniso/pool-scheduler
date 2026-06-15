@@ -25,6 +25,7 @@ const els = {
   bookingForm: document.querySelector("#bookingForm"),
   bookingDate: document.querySelector("#bookingDate"),
   bookingStart: document.querySelector("#bookingStart"),
+  bookingEnd: document.querySelector("#bookingEnd"),
   treatmentType: document.querySelector("#treatmentType"),
   bookingTherapist: document.querySelector("#bookingTherapist"),
   therapistField: document.querySelector("#therapistField"),
@@ -117,9 +118,25 @@ function timeSlots() {
   return slots;
 }
 
+function endTimeSlots() {
+  const slots = [];
+  const step = Number(state.settings.slotMinutes || 15);
+  const start = Number(state.settings.openingHour || 7) * 60 + step;
+  const end = Number(state.settings.closingHour || 22) * 60;
+  for (let minutes = start; minutes <= end; minutes += step) {
+    slots.push(`${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`);
+  }
+  return slots;
+}
+
 function timeToMinutes(time) {
   const [hours, mins] = String(time || "00:00").split(":").map(Number);
   return hours * 60 + mins;
+}
+
+function addMinutesToTime(time, minutes) {
+  const total = timeToMinutes(time) + minutes;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
 function bookingEndMinutes(booking) {
@@ -221,6 +238,30 @@ function renderTimeOptions() {
     option.textContent = slot;
     els.bookingStart.append(option);
   });
+  renderEndTimeOptions();
+}
+
+function renderEndTimeOptions() {
+  const previous = els.bookingEnd.value;
+  const start = els.bookingStart.value || timeSlots()[0];
+  const startMinutes = timeToMinutes(start);
+  els.bookingEnd.innerHTML = "";
+  endTimeSlots()
+    .filter((slot) => timeToMinutes(slot) > startMinutes)
+    .forEach((slot) => {
+      const option = document.createElement("option");
+      option.value = slot;
+      option.textContent = slot;
+      els.bookingEnd.append(option);
+    });
+  const defaultEnd = addMinutesToTime(start, 60);
+  if ([...els.bookingEnd.options].some((option) => option.value === previous && timeToMinutes(previous) > startMinutes)) {
+    els.bookingEnd.value = previous;
+  } else if ([...els.bookingEnd.options].some((option) => option.value === defaultEnd)) {
+    els.bookingEnd.value = defaultEnd;
+  } else {
+    els.bookingEnd.selectedIndex = 0;
+  }
 }
 
 function renderTreatmentTypes() {
@@ -241,6 +282,15 @@ function bookingsForSlot(date, start) {
   return state.bookings.filter((booking) => {
     if (booking.date !== date || !["pending", "approved"].includes(booking.status)) return false;
     return rangesOverlap(slotStart, slotEnd, timeToMinutes(booking.start), bookingEndMinutes(booking));
+  });
+}
+
+function bookingConflictsForRange(date, start, end) {
+  const rangeStart = timeToMinutes(start);
+  const rangeEnd = timeToMinutes(end);
+  return state.bookings.filter((booking) => {
+    if (booking.date !== date || !["pending", "approved"].includes(booking.status)) return false;
+    return rangesOverlap(rangeStart, rangeEnd, timeToMinutes(booking.start), bookingEndMinutes(booking));
   });
 }
 
@@ -478,6 +528,7 @@ function openBookingDialog(date = isoDate(new Date()), start = "08:00") {
   els.bookingForm.reset();
   els.bookingDate.value = date;
   els.bookingStart.value = start;
+  renderEndTimeOptions();
   if (state.user.role === "admin") {
     const firstTherapist = state.users.find((user) => user.role === "therapist");
     els.bookingTherapist.value = firstTherapist?.id || "";
@@ -489,6 +540,11 @@ async function submitBooking(event) {
   event.preventDefault();
   const payload = Object.fromEntries(new FormData(els.bookingForm).entries());
   payload.approveNow = els.approveNow.checked;
+  const conflicts = bookingConflictsForRange(payload.date, payload.start, payload.end);
+  if (conflicts.length) {
+    setStatus(`הטווח שבחרת חופף לזימון קיים (${conflicts[0].start}-${conflicts[0].end}).`, true);
+    return;
+  }
   try {
     await api("/api/bookings", { method: "POST", body: JSON.stringify(payload) });
     els.bookingDialog.close();
@@ -592,6 +648,7 @@ document.querySelector("#logoutBtn").addEventListener("click", () => { localStor
 document.querySelector("#closeDialogBtn").addEventListener("click", () => els.bookingDialog.close());
 els.loginForm.addEventListener("submit", login);
 els.bookingForm.addEventListener("submit", submitBooking);
+els.bookingStart.addEventListener("change", renderEndTimeOptions);
 els.userForm.addEventListener("submit", submitUser);
 els.usersAdminList.addEventListener("click", handleUsersListClick);
 showApp();

@@ -288,7 +288,7 @@ function validateSlot(db, date, start, ignoreId = "", requestedEnd = "") {
   const endTotal = requestedEnd ? timeToMinutes(requestedEnd) : startTotal + db.settings.slotMinutes;
   const openTotal = db.settings.openingHour * 60;
   const closeTotal = db.settings.closingHour * 60;
-  if (minute % db.settings.slotMinutes !== 0 || startTotal < openTotal || endTotal > closeTotal || endTotal <= startTotal) {
+  if (minute % db.settings.slotMinutes !== 0 || endTotal % db.settings.slotMinutes !== 0 || startTotal < openTotal || endTotal > closeTotal || endTotal <= startTotal) {
     const error = new Error("ניתן להזמין רק בין 07:00 ל-22:00 ובמרווחים של 15 דקות.");
     error.status = 400;
     throw error;
@@ -456,13 +456,14 @@ async function createBooking(req, body) {
   }
   const date = normalizeDate(body.date);
   const start = normalizeTime(body.start);
+  const end = body.end ? normalizeTime(body.end) : addMinutes(start, db.settings.slotMinutes);
   const treatmentType = String(body.treatmentType || "").trim();
   if (!db.settings.treatmentTypes.includes(treatmentType)) {
     const error = new Error("יש לבחור סוג טיפול מתוך הרשימה.");
     error.status = 400;
     throw error;
   }
-  validateSlot(db, date, start);
+  validateSlot(db, date, start, "", end);
   const now = new Date().toISOString();
   const booking = {
     id: crypto.randomUUID(),
@@ -470,7 +471,7 @@ async function createBooking(req, body) {
     therapistName: therapist.name,
     date,
     start,
-    end: addMinutes(start, db.settings.slotMinutes),
+    end,
     treatmentType,
     patientName: String(body.patientName || "").trim(),
     notes: String(body.notes || "").trim(),
