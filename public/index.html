@@ -29,53 +29,71 @@
     </main>
 
     <main id="appView" class="app-shell hidden">
-      <header class="topbar">
-        <div class="brand-row">
-          <div class="product-mark compact" aria-hidden="true">
-            <span></span><span></span><span></span><span></span>
-          </div>
-          <div>
-          <p class="eyebrow">לו"ז בריכה טיפולית</p>
-          <h1 id="weekTitle">ניהול זמינות וזימונים</h1>
-          </div>
+      <aside class="workspace-sidebar" aria-label="ניווט מערכת">
+        <div class="workspace-logo">
+          <span class="monday-mark" aria-hidden="true"></span>
+          <strong>Pool OS</strong>
         </div>
-        <div class="top-actions">
-          <button id="prevWeekBtn" type="button" aria-label="שבוע קודם">‹</button>
-          <button id="todayBtn" type="button">השבוע</button>
-          <button id="nextWeekBtn" type="button" aria-label="שבוע הבא">›</button>
-          <button id="logoutBtn" type="button">יציאה</button>
+        <nav class="workspace-nav">
+          <a class="active" href="#calendar">לוח זימונים</a>
+          <a href="#pendingList">אישורי מנהל</a>
+          <a href="#myBookings">הזימונים שלי</a>
+        </nav>
+        <div class="sidebar-note">
+          <span>Workspace</span>
+          <strong>בריכה טיפולית</strong>
         </div>
-      </header>
+      </aside>
 
-      <section class="summary-band">
-        <div class="metric-card user"><span>מחובר/ת</span><strong id="userName"></strong></div>
-        <div class="metric-card pending"><span>ממתינים לאישור</span><strong id="pendingCount">0</strong></div>
-        <div class="metric-card approved"><span>מאושרים השבוע</span><strong id="approvedCount">0</strong></div>
-        <button id="newBookingBtn" class="primary" type="button">זימון חדש</button>
-      </section>
-
-      <section class="content-grid">
-        <section class="schedule-section">
-          <div class="calendar-toolbar">
+      <section class="workspace-main">
+        <header class="topbar">
+          <div class="brand-row">
+            <div class="board-icon" aria-hidden="true">
+              <span></span><span></span><span></span>
+            </div>
             <div>
-              <h2>לוח שבועי</h2>
-              <p id="calendarRange">בחר שעה פנויה כדי לפתוח בקשת זימון.</p>
-            </div>
-            <div class="legend" aria-label="מקרא סטטוסים">
-              <span><i class="legend-dot free"></i>פנוי</span>
-              <span><i class="legend-dot pending"></i>ממתין</span>
-              <span><i class="legend-dot approved"></i>מאושר</span>
-              <span><i class="legend-dot holiday"></i>שבת/חג</span>
+              <p class="eyebrow">לו"ז בריכה טיפולית</p>
+              <h1 id="weekTitle">ניהול זמינות וזימונים</h1>
             </div>
           </div>
-          <div id="calendar" class="calendar" aria-live="polite"></div>
+          <div class="top-actions">
+            <button id="prevWeekBtn" type="button" aria-label="שבוע קודם">‹</button>
+            <button id="todayBtn" type="button">השבוע</button>
+            <button id="nextWeekBtn" type="button" aria-label="שבוע הבא">›</button>
+            <button id="logoutBtn" type="button">יציאה</button>
+          </div>
+        </header>
+
+        <section class="summary-band">
+          <div class="metric-card user"><span>מחובר/ת</span><strong id="userName"></strong></div>
+          <div class="metric-card pending"><span>ממתינים לאישור</span><strong id="pendingCount">0</strong></div>
+          <div class="metric-card approved"><span>מאושרים השבוע</span><strong id="approvedCount">0</strong></div>
+          <button id="newBookingBtn" class="primary" type="button">זימון חדש</button>
         </section>
-        <aside class="side-panel">
-          <section class="panel"><h2>בקשות ממתינות</h2><div id="pendingList" class="booking-list"></div></section>
-          <section class="panel"><h2>הזימונים שלי</h2><div id="myBookings" class="booking-list"></div></section>
-        </aside>
+
+        <section class="content-grid">
+          <section class="schedule-section">
+            <div class="calendar-toolbar">
+              <div>
+                <h2>לוח שבועי</h2>
+                <p id="calendarRange">בחר שעה פנויה כדי לפתוח בקשת זימון.</p>
+              </div>
+              <div class="legend" aria-label="מקרא סטטוסים">
+                <span><i class="legend-dot free"></i>פנוי</span>
+                <span><i class="legend-dot pending"></i>ממתין</span>
+                <span><i class="legend-dot approved"></i>מאושר</span>
+                <span><i class="legend-dot holiday"></i>שבת/חג</span>
+              </div>
+            </div>
+            <div id="calendar" class="calendar" aria-live="polite"></div>
+          </section>
+          <aside class="side-panel">
+            <section class="panel"><h2>בקשות ממתינות</h2><div id="pendingList" class="booking-list"></div></section>
+            <section class="panel"><h2>הזימונים שלי</h2><div id="myBookings" class="booking-list"></div></section>
+          </aside>
+        </section>
+        <p id="appStatus" class="floating-status" aria-live="polite"></p>
       </section>
-      <p id="appStatus" class="floating-status" aria-live="polite"></p>
     </main>
 
     <dialog id="bookingDialog">
