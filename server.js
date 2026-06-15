@@ -1,4 +1,5 @@
 const http = require("http");
+const https = require("https");
 const fs = require("fs/promises");
 const path = require("path");
 const crypto = require("crypto");
@@ -52,6 +53,87 @@ function appBaseUrl(req) {
 
 function setupUrl(req, token) {
   return `${appBaseUrl(req)}/?setup=${encodeURIComponent(token)}`;
+}
+
+function emailText(setupLink, isReset = false) {
+  return [
+    "שלום,",
+    "",
+    isReset
+      ? "נוצר עבורך קישור חדש להגדרת סיסמה במערכת הבריכה הטיפולית."
+      : "נפתח עבורך חשבון במערכת הבריכה הטיפולית.",
+    "להגדרת שם משתמש וסיסמה אישית יש ללחוץ על הקישור:",
+    setupLink,
+    "",
+    "הקישור תקף ל-7 ימים.",
+    ""
+  ].join("\n");
+}
+
+function emailHtml(setupLink, isReset = false) {
+  const title = isReset ? "איפוס סיסמה" : "הזמנה למערכת";
+  const message = isReset
+    ? "נוצר עבורך קישור חדש להגדרת סיסמה במערכת הבריכה הטיפולית."
+    : "נפתח עבורך חשבון במערכת הבריכה הטיפולית.";
+  return `
+    <div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.6;color:#222">
+      <h2>${title}</h2>
+      <p>${message}</p>
+      <p>להגדרת שם משתמש וסיסמה אישית יש ללחוץ על הכפתור:</p>
+      <p><a href="${setupLink}" style="display:inline-block;background:#0073ea;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none;font-weight:bold">הגדרת חשבון</a></p>
+      <p>אם הכפתור לא עובד, אפשר להעתיק את הקישור הזה לדפדפן:</p>
+      <p dir="ltr" style="word-break:break-all">${setupLink}</p>
+      <p>הקישור תקף ל-7 ימים.</p>
+    </div>
+  `;
+}
+
+function postJson(hostname, pathName, headers, payload) {
+  const body = JSON.stringify(payload);
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname,
+      path: pathName,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body),
+        ...headers
+      }
+    }, (res) => {
+      let raw = "";
+      res.setEncoding("utf8");
+      res.on("data", (chunk) => { raw += chunk; });
+      res.on("end", () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) return resolve(raw);
+        reject(new Error(`Email provider failed with status ${res.statusCode}: ${raw}`));
+      });
+    });
+    req.on("error", reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+async function sendInviteEmail(user, setupLink, isReset = false) {
+  if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) {
+    return { sent: false, reason: "missing-email-config" };
+  }
+  try {
+    await postJson("api.resend.com", "/emails", {
+      Authorization: `Bearer ${process.env.RESEND_API_KEY}`
+    }, {
+      from: process.env.EMAIL_FROM,
+      to: [user.email],
+      subject: isReset ? "איפוס סיסמה למערכת הבריכה הטיפולית" : "הזמנה למערכת הבריכה הטיפולית",
+      text: emailText(setupLink, isReset),
+      html: emailHtml(setupLink, isReset)
+    });
+    return { sent: true };
+  } catch (error) {
+    console.error("Invite email failed:", error.message);
+    return { sent: false, reason: "email-provider-error" };
+  }
 }
 
 function findUserBySetupToken(db, token) {
@@ -463,7 +545,9 @@ async function createUser(req, body) {
   const token = createSetupToken(user);
   db.users.push(user);
   await writeJson(DB_FILE, db);
-  return { user: publicUser(user), setupUrl: setupUrl(req, token) };
+  const link = setupUrl(req, token);
+  const email = await sendInviteEmail(user, link);
+  return { user: publicUser(user), setupUrl: link, emailSent: email.sent, emailReason: email.reason || "" };
 }
 
 async function updateUser(req, id, body) {
@@ -504,7 +588,9 @@ async function resetUserPassword(req, id) {
   delete user.passwordHash;
   user.passwordResetAt = new Date().toISOString();
   await writeJson(DB_FILE, db);
-  return { user: publicUser(user), setupUrl: setupUrl(req, token) };
+  const link = setupUrl(req, token);
+  const email = await sendInviteEmail(user, link, true);
+  return { user: publicUser(user), setupUrl: link, emailSent: email.sent, emailReason: email.reason || "" };
 }
 
 async function setupTokenInfo(body) {

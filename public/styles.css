@@ -190,6 +190,9 @@ h2 { font-size: 20px; }
 .invite-result > div:first-child { display: grid; gap: 3px; }
 .invite-result strong { color: var(--ink); }
 .invite-result span { color: var(--muted); font-weight: 700; }
+.invite-result small { width: fit-content; padding: 4px 8px; border-radius: 6px; font-weight: 800; }
+.email-sent { background: #e8f7ef; color: #08743f; }
+.email-warning { background: #fff2df; color: #9b5d12; }
 .setup-link-input { direction: ltr; text-align: left; font-family: Consolas, "Segoe UI", monospace; font-size: 13px; }
 .invite-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .button-link { display: inline-flex; align-items: center; justify-content: center; min-height: 34px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink); text-decoration: none; font-size: 13px; font-weight: 800; }

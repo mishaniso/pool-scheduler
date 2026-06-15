@@ -250,8 +250,11 @@ async function submitSetup(event) {
   }
 }
 
-function renderInviteResult({ setupUrl, user }, title = "קישור ההזמנה נוצר") {
+function renderInviteResult({ setupUrl, user, emailSent }, title = "קישור ההזמנה נוצר") {
   if (!setupUrl || !els.inviteResult) return;
+  const emailNote = emailSent
+    ? "המייל נשלח למשתמש באופן אוטומטי."
+    : "המייל עדיין לא נשלח אוטומטית כי לא הוגדר שירות מייל ב-Render. אפשר לשלוח את הקישור ידנית.";
   const subject = encodeURIComponent("הגדרת חשבון למערכת הבריכה הטיפולית");
   const body = encodeURIComponent(`שלום,\n\nנפתח עבורך חשבון במערכת הבריכה הטיפולית.\nלהגדרת שם משתמש וסיסמה אישית יש ללחוץ על הקישור:\n${setupUrl}\n\nהקישור תקף ל-7 ימים.`);
   els.inviteResult.classList.remove("hidden");
@@ -259,6 +262,7 @@ function renderInviteResult({ setupUrl, user }, title = "קישור ההזמנה
     <div>
       <strong>${title}</strong>
       <span>${escapeHtml(user?.email || "")}</span>
+      <small class="${emailSent ? "email-sent" : "email-warning"}">${emailNote}</small>
     </div>
     <input class="setup-link-input" type="text" readonly value="${escapeHtml(setupUrl)}" aria-label="קישור הגדרת חשבון" />
     <div class="invite-actions">
@@ -799,7 +803,7 @@ async function submitInviteUser(event) {
     els.userForm.reset();
     await loadData();
     renderInviteResult(data);
-    setStatus("המשתמש הוזמן. יש לשלוח לו את קישור ההגדרה.");
+    setStatus(data.emailSent ? "המשתמש הוזמן והמייל נשלח." : "המשתמש הוזמן, אבל צריך להגדיר שירות מייל כדי לשלוח אוטומטית.");
   } catch (error) {
     setStatus(error.message, true);
   }
@@ -812,7 +816,7 @@ async function resetUserPassword(id) {
     const data = await api(`/api/users/${id}/reset-password`, { method: "POST" });
     await loadData();
     renderInviteResult(data, "קישור איפוס סיסמה נוצר");
-    setStatus("נוצר קישור איפוס סיסמה חדש.");
+    setStatus(data.emailSent ? "נוצר קישור איפוס והמייל נשלח." : "נוצר קישור איפוס, אבל צריך להגדיר שירות מייל כדי לשלוח אוטומטית.");
   } catch (error) {
     setStatus(error.message, true);
   }
