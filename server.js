@@ -26,6 +26,13 @@ function hebrewDateParts(date) {
   };
 }
 
+function localDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function holidayNameForHebrewDate(month, day) {
   const normalizedMonth = month === "Adar II" ? "Adar" : month;
   const holidays = {
@@ -71,7 +78,7 @@ function buildIsraeliHolidays(years = [new Date().getFullYear() - 1, new Date().
     while (cursor.getFullYear() === year) {
       const { month, day } = hebrewDateParts(cursor);
       const name = holidayNameForHebrewDate(month, day);
-      if (name) holidays.push({ date: cursor.toISOString().slice(0, 10), name, source: "2net calendar reference" });
+      if (name) holidays.push({ date: localDateKey(cursor), name, source: "2net calendar reference" });
       cursor.setDate(cursor.getDate() + 1);
     }
   });
